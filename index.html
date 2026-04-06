@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Backgammon</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #2c3e50; color: white; }
+        #board { display: flex; flex-wrap: wrap; width: 600px; margin: 20px auto; background: #34495e; padding: 10px; border-radius: 8px; }
+        .point { width: 40px; height: 120px; border: 1px solid #555; margin: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .checker { width: 30px; height: 30px; border-radius: 50%; margin: 2px; border: 2px solid #333; }
+        .white { background: #ecf0f1; }
+        .black { background: #222; }
+        .controls { margin-top: 20px; background: #1a252f; padding: 20px; border-radius: 10px; }
+        input, button { padding: 10px; font-size: 1rem; border-radius: 5px; border: none; margin: 5px; }
+        button { cursor: pointer; background: #27ae60; color: white; font-weight: bold; }
+        button:hover { background: #2ecc71; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>Backgammon P2P</h1>
+
+    <div id="setup">
+        <button onclick="createGame()">Create Game (Host)</button>
+        <p>OR</p>
+        <input type="text" id="joinId" placeholder="Enter 4-Letter ID">
+        <button onclick="joinGame()">Join Game</button>
+    </div>
+
+    <div id="game-info" class="hidden">
+        <p>Your ID: <strong id="display-id">...</strong></p>
+        <p id="status">Waiting for player...</p>
+        <div id="dice-container">
+            <button id="roll-btn" onclick="rollDice()">Roll Dice</button>
+            <span id="dice-val"></span>
+        </div>
+    </div>
+
+    <div id="board" class="hidden">
+        </div>
+
+    <script>
+        let peer, conn;
+        let myRole = ''; // 'host' or 'guest'
+        let gameState = {
+            board: [2,0,0,0,0,-5,0,-3,0,0,0,5,-5,0,0,0,3,0,5,0,0,0,0,-2], // Standard start
+            turn: 'host'
+        };
+
+        // --- P2P Logic ---
+        function createGame() {
+            const id = Math.random().toString(36).substring(2, 6).toUpperCase();
+            initPeer(id);
+            myRole = 'host';
+            document.getElementById('display-id').innerText = id;
+        }
+
+        function joinGame() {
+            const id = document.getElementById('joinId').value.toUpperCase();
+            initPeer();
+            myRole = 'guest';
+            setTimeout(() => {
+                conn = peer.connect(id);
+                setupConn();
+            }, 1000);
+        }
+
+        function initPeer(id = null) {
+            peer = id ? new Peer(id) : new Peer();
+            peer.on('open', (myId) => {
+                document.getElementById('setup').classList.add('hidden');
+                document.getElementById('game-info').classList.remove('hidden');
+                document.getElementById('board').classList.remove('hidden');
+                if(!id) document.getElementById('display-id').innerText = "Connecting...";
+            });
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConn();
+            });
+        }
+
+        function setupConn() {
+            conn.on('open', () => {
+                document.getElementById('status').innerText = "Connected! Game On.";
+                renderBoard();
+            });
+            conn.on('data', (data) => {
+                gameState = data;
+                renderBoard();
+            });
+        }
+
+        // --- Game Logic ---
+        function renderBoard() {
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+            gameState.board.forEach((val, i) => {
+                const pt = document.createElement('div');
+                pt.className = 'point';
+                pt.innerHTML = `<small style="position:absolute; bottom:0; color:#999">${i}</small>`;
+                
+                const count = Math.abs(val);
+                const color = val > 0 ? 'white' : 'black';
+                for(let n=0; n<count; n++) {
+                    const checker = document.createElement('div');
+                    checker.className = `checker ${color}`;
+                    pt.appendChild(checker);
+                }
+                
+                pt.onclick = () => handlePointClick(i);
+                boardDiv.appendChild(pt);
+            });
+            document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
+        }
+
+        let selectedPoint = null;
+        function handlePointClick(i) {
+            if (gameState.turn !== myRole) return;
+
+            if (selectedPoint === null) {
+                if (gameState.board[i] === 0) return;
+                selectedPoint = i;
+                document.querySelectorAll('.point')[i].style.background = '#4e6a85';
+            } else {
+                // Move logic (Basic - no rules enforced yet)
+                const piece = gameState.board[selectedPoint] > 0 ? 1 : -1;
+                gameState.board[selectedPoint] -= piece;
+                gameState.board[i] += piece;
+                
+                gameState.turn = (myRole === 'host') ? 'guest' : 'host';
+                selectedPoint = null;
+                sync();
+            }
+        }
+
+        function rollDice() {
+            if (gameState.turn !== myRole) return;
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            document.getElementById('dice-val').innerText = `🎲 ${d1} , ${d2}`;
+        }
+
+        function sync() {
+            renderBoard();
+            if(conn) conn.send(gameState);
+        }
+    </script>
+</body>
+</html>
