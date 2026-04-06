@@ -100,11 +100,17 @@
             align-items: center;
             justify-content: flex-start;
             overflow: hidden;
-            background: transparent;
+            background: #2a2520;
+            border-right: 1px solid #3a3a30;
         }
         
         .triangle-svg {
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
         
         .point:hover .triangle-svg {
@@ -376,6 +382,7 @@
         function renderBoard() {
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
+            console.log('renderBoard called, gameState:', gameState);
             
             // Top row: points 24-13 (right to left)
             const topRow = document.createElement('div');
@@ -393,6 +400,7 @@
             }
             boardDiv.appendChild(bottomRow);
             
+            console.log('Board rendered with', boardDiv.querySelectorAll('.point').length, 'points');
             document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
         }
         
@@ -411,43 +419,31 @@
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', '0 0 100 240');
             svg.setAttribute('preserveAspectRatio', 'none');
-            svg.setAttribute('style', 'position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1;');
+            svg.setAttribute('class', 'triangle-svg');
             
-            // Draw background triangle
-            const bgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) {
-                bgPath.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            } else {
-                bgPath.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            }
-            bgPath.setAttribute('fill', colors[0]);
-            bgPath.setAttribute('stroke', 'none');
-            svg.appendChild(bgPath);
+            // DEBUG: Try simple rect instead of complex shapes
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', '0');
+            rect.setAttribute('y', '0');
+            rect.setAttribute('width', '100');
+            rect.setAttribute('height', '240');
+            rect.setAttribute('fill', colors[0]);
+            svg.appendChild(rect);
             
-            // Draw vertical wood grain stripes
-            const stripeWidth = 100 / (colors.length * 1.5);
-            for(let j = 1; j < colors.length; j++) {
+            // Draw vertical wood grain stripes within the triangle area
+            const stripeCount = 6;
+            for(let j = 0; j < stripeCount; j++) {
+                const x = (100 / stripeCount) * j;
+                const stripeWidth = 100 / stripeCount;
                 const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                stripe.setAttribute('x', j * stripeWidth);
+                stripe.setAttribute('x', x.toString());
                 stripe.setAttribute('y', '0');
-                stripe.setAttribute('width', stripeWidth * 0.8);
+                stripe.setAttribute('width', stripeWidth.toString());
                 stripe.setAttribute('height', '240');
-                stripe.setAttribute('fill', colors[j]);
-                stripe.setAttribute('opacity', '0.9');
+                stripe.setAttribute('fill', colors[j % colors.length]);
+                stripe.setAttribute('opacity', '0.7');
                 svg.appendChild(stripe);
             }
-            
-            // Draw triangle outline
-            const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) {
-                outline.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            } else {
-                outline.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            }
-            outline.setAttribute('fill', 'none');
-            outline.setAttribute('stroke', 'rgba(0,0,0,0.2)');
-            outline.setAttribute('stroke-width', '0.5');
-            svg.appendChild(outline);
             
             pt.appendChild(svg);
             
