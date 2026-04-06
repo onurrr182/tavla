@@ -146,23 +146,28 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 
-                0 10px 20px rgba(0,0,0,0.7),
-                inset -2px -2px 5px rgba(0,0,0,0.4),
-                inset 2px 2px 5px rgba(255,255,255,0.1);
+            box-shadow: 0 10px 18px rgba(0,0,0,0.55);
             cursor: grab;
             pointer-events: auto;
-            transition: transform 0.15s ease;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
             position: relative;
             margin: -20px 0;
+            border: 1px solid rgba(0,0,0,0.25);
         }
         
         .checker:hover {
             transform: scale(1.12) translateY(-3px);
             box-shadow: 
                 0 14px 28px rgba(0,0,0,0.8),
-                inset -2px -2px 5px rgba(0,0,0,0.4),
-                inset 2px 2px 5px rgba(255,255,255,0.15);
+                inset -2px -2px 6px rgba(0,0,0,0.18);
+        }
+
+        .checker.white {
+            background: radial-gradient(circle at 35% 25%, #ffffff 0%, #f1f1f1 40%, #dcdcdc 100%);
+        }
+
+        .checker.black {
+            background: radial-gradient(circle at 35% 25%, #222222 0%, #111111 45%, #000000 100%);
         }
         
         .checker:active {
@@ -408,68 +413,97 @@
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
-            
-            // Determine colors based on position
+
+            // Clean stylized colors
             const isDark = i % 2 === 1;
-            const darkColors = ['#8B7355', '#7A6B52', '#9D8B72', '#A89470'];
-            const lightColors = ['#D4B896', '#C9A96A', '#E0CCAD', '#DCC8A8'];
-            const colors = isDark ? darkColors : lightColors;
-            
-            // Create SVG triangle with wood grain stripes
+            const baseDark = '#7A5B3F';
+            const baseLight = '#E8DAC0';
+            const base = isDark ? baseDark : baseLight;
+
+            // SVG triangle with a simple vertical gradient for a clean look
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', '0 0 100 240');
             svg.setAttribute('preserveAspectRatio', 'none');
             svg.setAttribute('class', 'triangle-svg');
-            
-            // DEBUG: Try simple rect instead of complex shapes
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', '0');
-            rect.setAttribute('y', '0');
-            rect.setAttribute('width', '100');
-            rect.setAttribute('height', '240');
-            rect.setAttribute('fill', colors[0]);
-            svg.appendChild(rect);
-            
-            // Draw vertical wood grain stripes within the triangle area
-            const stripeCount = 6;
-            for(let j = 0; j < stripeCount; j++) {
-                const x = (100 / stripeCount) * j;
-                const stripeWidth = 100 / stripeCount;
-                const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                stripe.setAttribute('x', x.toString());
-                stripe.setAttribute('y', '0');
-                stripe.setAttribute('width', stripeWidth.toString());
-                stripe.setAttribute('height', '240');
-                stripe.setAttribute('fill', colors[j % colors.length]);
-                stripe.setAttribute('opacity', '0.7');
-                svg.appendChild(stripe);
-            }
-            
+
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+            const gid = 'g' + i;
+            grad.setAttribute('id', gid);
+            grad.setAttribute('x1', '0');
+            grad.setAttribute('y1', isTopHalf ? '0' : '1');
+            grad.setAttribute('x2', '0');
+            grad.setAttribute('y2', isTopHalf ? '1' : '0');
+
+            const sA = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            sA.setAttribute('offset', '0%');
+            sA.setAttribute('stop-color', base);
+            sA.setAttribute('stop-opacity', '1');
+            grad.appendChild(sA);
+
+            const sB = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            sB.setAttribute('offset', '100%');
+            sB.setAttribute('stop-color', shadeColor(base, -14));
+            sB.setAttribute('stop-opacity', '1');
+            grad.appendChild(sB);
+
+            defs.appendChild(grad);
+            svg.appendChild(defs);
+
+            const tri = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) tri.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            else tri.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            tri.setAttribute('fill', 'url(#' + gid + ')');
+            svg.appendChild(tri);
+
+            // Thin subtle stroke for crisp edges
+            const edge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) edge.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            else edge.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            edge.setAttribute('fill', 'none');
+            edge.setAttribute('stroke', 'rgba(0,0,0,0.32)');
+            edge.setAttribute('stroke-width', '0.9');
+            svg.appendChild(edge);
+
             pt.appendChild(svg);
-            
+
             // Create checkers container
             const checkersDiv = document.createElement('div');
             checkersDiv.className = 'checkers';
-            
+
             const val = gameState.board[i];
             const count = Math.abs(val);
             const color = val > 0 ? 'white' : 'black';
-            
+
             for(let n=0; n<count && n<6; n++) {
                 const checker = document.createElement('div');
                 checker.className = `checker ${color}`;
                 checkersDiv.appendChild(checker);
             }
-            
+
             pt.appendChild(checkersDiv);
-            
+
             const label = document.createElement('div');
             label.className = 'point-label';
             label.textContent = i+1;
             pt.appendChild(label);
-            
+
             pt.onclick = () => handlePointClick(i);
             return pt;
+        }
+
+        // Utility: shade a hex color by percent (-100..100)
+        function shadeColor(hex, percent) {
+            const h = hex.replace('#','');
+            const r = parseInt(h.substring(0,2),16);
+            const g = parseInt(h.substring(2,4),16);
+            const b = parseInt(h.substring(4,6),16);
+            const t = percent < 0 ? 0 : 255;
+            const p = Math.abs(percent) / 100;
+            const R = Math.round((t - r) * p) + r;
+            const G = Math.round((t - g) * p) + g;
+            const B = Math.round((t - b) * p) + b;
+            return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
         }
         
         let selectedPoint = null;
