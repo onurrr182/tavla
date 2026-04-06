@@ -27,74 +27,100 @@
         }
         
         #board {
-            width: 920px;
-            max-width: 95vw;
+            width: 950px;
+            max-width: 96vw;
             margin: 30px auto;
             background: linear-gradient(180deg, #a89968 0%, #c9b882 50%, #a89968 100%);
             padding: 20px;
             border-radius: 8px;
-            border: 10px solid #6d5d45;
+            border: 12px solid #705a45;
             box-shadow: 0 15px 50px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
             display: flex;
             flex-direction: column;
-            gap: 12px;
-        }
-        
-        .board-row {
-            display: flex;
-            gap: 4px;
-            justify-content: center;
-            height: 150px;
+            gap: 0;
         }
         
         .point {
-            width: 50px;
-            height: 150px;
             position: relative;
             cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
             flex-direction: column;
-            clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
-            background: linear-gradient(135deg, #3a2f25 0%, #2a1f15 100%);
-            transition: all 0.2s ease;
-            flex-shrink: 0;
+            align-items: center;
         }
         
-        .point:nth-child(even) {
-            background: linear-gradient(135deg, #4a3f35 0%, #3a2f25 100%);
+        .point-shape {
+            width: 0;
+            height: 0;
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
         }
         
-        .point:hover {
+        /* Top row points - triangles pointing DOWN - lighter color */
+        .top-half .point-shape {
+            border-top: 110px solid #4a3f35;
+            top: 0;
+            width: 60px !important;
+        }
+        
+        .top-half .point-shape.alt {
+            border-top-color: #3a3025;
+        }
+        
+        /* Bottom row points - triangles pointing UP - darker color */
+        .bottom-half .point-shape {
+            border-bottom: 110px solid #3a3025;
+            bottom: 0;
+            width: 60px !important;
+            transform: rotate(180deg);
+        }
+        
+        .bottom-half .point-shape.alt {
+            border-bottom-color: #4a3f35;
+        }
+        
+        .point:hover .point-shape {
             filter: brightness(1.2);
         }
         
-        .point.selected {
-            filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.9));
+        .point.selected .point-shape {
+            filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.9)) brightness(1.15);
         }
         
         .checkers {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
-            padding-top: 6px;
-            width: 100%;
+            gap: 1px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translateX(-50%);
             pointer-events: none;
+            z-index: 5;
+        }
+        
+        .bottom-half .checkers {
+            flex-direction: column-reverse;
+            bottom: 15px;
+            top: auto;
         }
         
         .checker {
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 0 5px 12px rgba(0,0,0,0.7), inset -2px -2px 4px rgba(0,0,0,0.4), inset 2px 2px 4px rgba(255,255,255,0.2);
-            transition: transform 0.15s ease;
             cursor: grab;
             pointer-events: auto;
+            transition: transform 0.15s ease;
         }
         
         .checker:active {
@@ -117,7 +143,12 @@
             font-size: 0.65rem;
             font-weight: bold;
             color: #888;
-            z-index: 10;
+            z-index: 4;
+        }
+        
+        .bottom-half .point-label {
+            top: 2px;
+            bottom: auto;
         }
         
         #setup, #game-info {
@@ -298,30 +329,51 @@
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
             
-            // Top row: points 13-24 (right to left)
-            const topRow = document.createElement('div');
-            topRow.className = 'board-row';
+            // Create wrapper divs for top and bottom halves
+            const topHalf = document.createElement('div');
+            topHalf.className = 'top-half';
+            topHalf.style.gridColumn = '1 / -1';
+            topHalf.style.display = 'grid';
+            topHalf.style.gridTemplateColumns = 'repeat(12, 1fr)';
+            topHalf.style.gap = '3px';
+            topHalf.style.height = '180px';
+            
+            const bottomHalf = document.createElement('div');
+            bottomHalf.className = 'bottom-half';
+            bottomHalf.style.gridColumn = '1 / -1';
+            bottomHalf.style.display = 'grid';
+            bottomHalf.style.gridTemplateColumns = 'repeat(12, 1fr)';
+            bottomHalf.style.gap = '3px';
+            bottomHalf.style.height = '180px';
+            
+            // Top row: points 24-13 (right to left)
             for(let i=23; i>=12; i--) {
-                topRow.appendChild(createPoint(i));
+                topHalf.appendChild(createPoint(i, true));
             }
-            boardDiv.appendChild(topRow);
             
             // Bottom row: points 1-12 (left to right)
-            const bottomRow = document.createElement('div');
-            bottomRow.className = 'board-row';
             for(let i=0; i<12; i++) {
-                bottomRow.appendChild(createPoint(i));
+                bottomHalf.appendChild(createPoint(i, false));
             }
-            boardDiv.appendChild(bottomRow);
+            
+            boardDiv.appendChild(topHalf);
+            boardDiv.appendChild(bottomHalf);
             
             document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
         }
         
-        function createPoint(i) {
+        function createPoint(i, isTop) {
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
             
+            // Create triangle shape
+            const shapeDiv = document.createElement('div');
+            shapeDiv.className = 'point-shape';
+            if(i % 2 === 1) shapeDiv.classList.add('alt');
+            pt.appendChild(shapeDiv);
+            
+            // Create checkers container
             const checkersDiv = document.createElement('div');
             checkersDiv.className = 'checkers';
             
@@ -329,7 +381,7 @@
             const count = Math.abs(val);
             const color = val > 0 ? 'white' : 'black';
             
-            for(let n=0; n<count; n++) {
+            for(let n=0; n<count && n<6; n++) {
                 const checker = document.createElement('div');
                 checker.className = `checker ${color}`;
                 checkersDiv.appendChild(checker);
@@ -337,6 +389,7 @@
             
             pt.appendChild(checkersDiv);
             
+            // Add label
             const label = document.createElement('div');
             label.className = 'point-label';
             label.textContent = i+1;
