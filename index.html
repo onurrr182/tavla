@@ -414,56 +414,173 @@
             pt.className = 'point';
             pt.setAttribute('data-index', i);
 
-            // Clean stylized colors
+            // Photorealistic-ish wood colors
             const isDark = i % 2 === 1;
-            const baseDark = '#7A5B3F';
-            const baseLight = '#E8DAC0';
-            const base = isDark ? baseDark : baseLight;
+            const darkBase = '#6b4f36';
+            const lightBase = '#e6d3b0';
+            const base = isDark ? darkBase : lightBase;
 
-            // SVG triangle with a simple vertical gradient for a clean look
+            // SVG container
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', '0 0 100 240');
             svg.setAttribute('preserveAspectRatio', 'none');
             svg.setAttribute('class', 'triangle-svg');
 
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-            const gid = 'g' + i;
-            grad.setAttribute('id', gid);
-            grad.setAttribute('x1', '0');
-            grad.setAttribute('y1', isTopHalf ? '0' : '1');
-            grad.setAttribute('x2', '0');
-            grad.setAttribute('y2', isTopHalf ? '1' : '0');
 
-            const sA = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-            sA.setAttribute('offset', '0%');
-            sA.setAttribute('stop-color', base);
-            sA.setAttribute('stop-opacity', '1');
-            grad.appendChild(sA);
+            const uid = 'u' + i;
+            const patternId = 'pattern-' + uid;
+            const noiseId = 'noise-' + uid;
+            const innerId = 'inner-' + uid;
+            const clipId = 'clip-' + uid;
 
-            const sB = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-            sB.setAttribute('offset', '100%');
-            sB.setAttribute('stop-color', shadeColor(base, -14));
-            sB.setAttribute('stop-opacity', '1');
-            grad.appendChild(sB);
+            // Thin stripe pattern
+            const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+            pattern.setAttribute('id', patternId);
+            pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+            pattern.setAttribute('width', '4');
+            pattern.setAttribute('height', '4');
 
-            defs.appendChild(grad);
+            // base stripe and narrow dark streak
+            const pRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            pRect.setAttribute('x', '0');
+            pRect.setAttribute('y', '0');
+            pRect.setAttribute('width', '4');
+            pRect.setAttribute('height', '4');
+            pRect.setAttribute('fill', base);
+            pattern.appendChild(pRect);
+
+            const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            stripe.setAttribute('x', '1.6');
+            stripe.setAttribute('y', '0');
+            stripe.setAttribute('width', '0.8');
+            stripe.setAttribute('height', '4');
+            stripe.setAttribute('fill', shadeColor(base, -18));
+            stripe.setAttribute('opacity', '0.25');
+            pattern.appendChild(stripe);
+
+            defs.appendChild(pattern);
+
+            // turbulence noise for subtle grain overlay
+            const filterNoise = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+            filterNoise.setAttribute('id', noiseId);
+            const turb = document.createElementNS('http://www.w3.org/2000/svg', 'feTurbulence');
+            turb.setAttribute('type', 'fractalNoise');
+            turb.setAttribute('baseFrequency', '0.8');
+            turb.setAttribute('numOctaves', '2');
+            turb.setAttribute('result', 'turb');
+            filterNoise.appendChild(turb);
+            const col = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+            col.setAttribute('in', 'turb');
+            col.setAttribute('type', 'saturate');
+            col.setAttribute('values', '0');
+            col.setAttribute('result', 'mono');
+            filterNoise.appendChild(col);
+            defs.appendChild(filterNoise);
+
+            // inner shadow filter
+            const filterInner = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+            filterInner.setAttribute('id', innerId);
+            filterInner.setAttribute('x', '-20%');
+            filterInner.setAttribute('y', '-20%');
+            filterInner.setAttribute('width', '140%');
+            filterInner.setAttribute('height', '140%');
+            const feOffset = document.createElementNS('http://www.w3.org/2000/svg', 'feOffset');
+            feOffset.setAttribute('dx', '0');
+            feOffset.setAttribute('dy', '2');
+            feOffset.setAttribute('result', 'off');
+            const feGauss = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+            feGauss.setAttribute('in', 'off');
+            feGauss.setAttribute('stdDeviation', '3');
+            feGauss.setAttribute('result', 'blur');
+            const feComp = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+            feComp.setAttribute('in', 'blur');
+            feComp.setAttribute('in2', 'SourceAlpha');
+            feComp.setAttribute('operator', 'arithmetic');
+            feComp.setAttribute('k1', '0');
+            feComp.setAttribute('k2', '1');
+            feComp.setAttribute('k3', '-1');
+            feComp.setAttribute('k4', '0');
+            feComp.setAttribute('result', 'inner');
+            const feColor = document.createElementNS('http://www.w3.org/2000/svg', 'feFlood');
+            feColor.setAttribute('flood-color', 'rgba(0,0,0,0.28)');
+            feColor.setAttribute('result', 'flood');
+            const feComp2 = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+            feComp2.setAttribute('in', 'flood');
+            feComp2.setAttribute('in2', 'inner');
+            feComp2.setAttribute('operator', 'in');
+            feComp2.setAttribute('result', 'innerColor');
+            const feBlend = document.createElementNS('http://www.w3.org/2000/svg', 'feBlend');
+            feBlend.setAttribute('in', 'SourceGraphic');
+            feBlend.setAttribute('in2', 'innerColor');
+            feBlend.setAttribute('mode', 'normal');
+            filterInner.appendChild(feOffset);
+            filterInner.appendChild(feGauss);
+            filterInner.appendChild(feComp);
+            filterInner.appendChild(feColor);
+            filterInner.appendChild(feComp2);
+            filterInner.appendChild(feBlend);
+            defs.appendChild(filterInner);
+
+            // clip path triangle for crisp pattern edges
+            const clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+            clip.setAttribute('id', clipId);
+            const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) clipPath.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            else clipPath.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            clip.appendChild(clipPath);
+            defs.appendChild(clip);
+
             svg.appendChild(defs);
 
-            const tri = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) tri.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            else tri.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            tri.setAttribute('fill', 'url(#' + gid + ')');
-            svg.appendChild(tri);
+            // main triangle filled with pattern
+            const main = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) main.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            else main.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            main.setAttribute('fill', 'url(#' + patternId + ')');
+            main.setAttribute('clip-path', 'url(#' + clipId + ')');
+            svg.appendChild(main);
 
-            // Thin subtle stroke for crisp edges
-            const edge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) edge.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            else edge.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            edge.setAttribute('fill', 'none');
-            edge.setAttribute('stroke', 'rgba(0,0,0,0.32)');
-            edge.setAttribute('stroke-width', '0.9');
-            svg.appendChild(edge);
+            // subtle noise overlay
+            const noiseRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            noiseRect.setAttribute('x', '0');
+            noiseRect.setAttribute('y', '0');
+            noiseRect.setAttribute('width', '100');
+            noiseRect.setAttribute('height', '240');
+            noiseRect.setAttribute('filter', 'url(#' + noiseId + ')');
+            noiseRect.setAttribute('opacity', '0.06');
+            noiseRect.setAttribute('clip-path', 'url(#' + clipId + ')');
+            svg.appendChild(noiseRect);
+
+            // inner shadow
+            main.setAttribute('filter', 'url(#' + innerId + ')');
+
+            // highlight overlay (bevel)
+            const hv = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+            const hvId = 'hv-' + uid;
+            hv.setAttribute('id', hvId);
+            hv.setAttribute('x1', '0'); hv.setAttribute('y1', '0'); hv.setAttribute('x2', '0'); hv.setAttribute('y2', '1');
+            const hvA = document.createElementNS('http://www.w3.org/2000/svg', 'stop'); hvA.setAttribute('offset','0%'); hvA.setAttribute('stop-color','rgba(255,255,255,0.12)');
+            const hvB = document.createElementNS('http://www.w3.org/2000/svg', 'stop'); hvB.setAttribute('offset','60%'); hvB.setAttribute('stop-color','rgba(255,255,255,0)');
+            hv.appendChild(hvA); hv.appendChild(hvB);
+            defs.appendChild(hv);
+
+            const bevel = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) bevel.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            else bevel.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            bevel.setAttribute('fill', 'url(#' + hvId + ')');
+            bevel.setAttribute('opacity', '0.6');
+            bevel.setAttribute('clip-path', 'url(#' + clipId + ')');
+            svg.appendChild(bevel);
+
+            // thin stroke for definition
+            const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) outline.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            else outline.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            outline.setAttribute('fill', 'none');
+            outline.setAttribute('stroke', 'rgba(0,0,0,0.45)');
+            outline.setAttribute('stroke-width', '0.9');
+            svg.appendChild(outline);
 
             pt.appendChild(svg);
 
