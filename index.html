@@ -189,8 +189,7 @@
         </div>
     </div>
 
-    <div id="board">
-        </div>
+    <div id="board" class="hidden"></div>
 
     <script>
         let peer, conn;
@@ -225,6 +224,7 @@
                 document.getElementById('setup').classList.add('hidden');
                 document.getElementById('game-info').classList.remove('hidden');
                 document.getElementById('board').classList.remove('hidden');
+                renderBoard();
                 if(!id) document.getElementById('display-id').innerText = "Connecting...";
             });
 
@@ -351,8 +351,6 @@
             renderBoard();
             if(conn) conn.send(gameState);
         }
-
-        renderBoard();
     </script>
 </body>
 </html>
