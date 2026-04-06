@@ -27,127 +27,163 @@
         }
         
         #board {
-            width: 950px;
+            width: 960px;
             max-width: 96vw;
             margin: 30px auto;
-            background: linear-gradient(180deg, #a89968 0%, #c9b882 50%, #a89968 100%);
-            padding: 20px;
-            border-radius: 8px;
-            border: 12px solid #705a45;
-            box-shadow: 0 15px 50px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+            background: linear-gradient(90deg, #c9a96a 0%, #d4b896 2%, #a89968 5%, #d4b896 7%, #b89960 10%, #d4b896 12%, #a68f5e 15%, #d4b896 18%, #c9a96a 20%, #a89968 22%, #d4b896 25%, #b89960 27%, #d4b896 30%, #a68f5e 32%, #d4b896 35%, #c9a96a 37%, #a89968 40%, #d4b896 42%, #b89960 45%, #d4b896 47%, #a68f5e 50%, #d4b896 52%, #c9a96a 55%, #a89968 57%, #d4b896 60%, #b89960 62%, #d4b896 65%, #a68f5e 67%, #d4b896 70%, #c9a96a 72%, #a89968 75%, #d4b896 77%, #b89960 80%, #d4b896 82%, #a68f5e 85%, #d4b896 87%, #c9a96a 90%, #a89968 92%, #d4b896 95%, #b89960 100%);
+            padding: 25px;
+            border-radius: 4px;
+            border: 16px solid #6d5d45;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9), inset 0 0 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
             display: flex;
             flex-direction: column;
-            gap: 0;
+            gap: 2px;
+        }
+        
+        .board-row {
+            display: flex;
+            gap: 2px;
+            height: 210px;
+            flex: 1;
         }
         
         .point {
+            flex: 1;
             position: relative;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: flex-start;
+            padding-top: 8px;
+            clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    transparent 0px,
+                    transparent 1px,
+                    rgba(0,0,0,0.08) 1px,
+                    rgba(0,0,0,0.08) 2px,
+                    transparent 2px,
+                    transparent 3px,
+                    rgba(255,255,255,0.02) 3px,
+                    rgba(255,255,255,0.02) 4px
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent 0px,
+                    transparent 2px,
+                    rgba(0,0,0,0.04) 2px,
+                    rgba(0,0,0,0.04) 3px
+                ),
+                linear-gradient(180deg, #d4b896 0%, #c9a96a 50%, #a89968 100%);
         }
         
-        .point-shape {
-            width: 0;
-            height: 0;
-            border-left: 30px solid transparent;
-            border-right: 30px solid transparent;
-            position: absolute;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
+        .point.light {
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    transparent 0px,
+                    transparent 1px,
+                    rgba(0,0,0,0.04) 1px,
+                    rgba(0,0,0,0.04) 2px,
+                    transparent 2px,
+                    transparent 3px,
+                    rgba(255,255,255,0.03) 3px,
+                    rgba(255,255,255,0.03) 4px
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent 0px,
+                    transparent 2px,
+                    rgba(0,0,0,0.02) 2px,
+                    rgba(0,0,0,0.02) 3px
+                ),
+                linear-gradient(180deg, #e8d4a8 0%, #d4b896 50%, #b89968 100%);
         }
         
-        /* Top row points - triangles pointing DOWN - lighter color */
-        .top-half .point-shape {
-            border-top: 110px solid #4a3f35;
-            top: 0;
-            width: 60px !important;
+        .point:hover {
+            filter: brightness(1.18) drop-shadow(0 0 10px rgba(212,175,55,0.7));
         }
         
-        .top-half .point-shape.alt {
-            border-top-color: #3a3025;
-        }
-        
-        /* Bottom row points - triangles pointing UP - darker color */
-        .bottom-half .point-shape {
-            border-bottom: 110px solid #3a3025;
-            bottom: 0;
-            width: 60px !important;
-            transform: rotate(180deg);
-        }
-        
-        .bottom-half .point-shape.alt {
-            border-bottom-color: #4a3f35;
-        }
-        
-        .point:hover .point-shape {
-            filter: brightness(1.2);
-        }
-        
-        .point.selected .point-shape {
-            filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.9)) brightness(1.15);
+        .point.selected {
+            filter: drop-shadow(0 0 18px rgba(212, 175, 55, 1)) brightness(1.3);
+            z-index: 10;
         }
         
         .checkers {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1px;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translateX(-50%);
+            gap: 0px;
+            width: 100%;
             pointer-events: none;
-            z-index: 5;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         
         .bottom-half .checkers {
             flex-direction: column-reverse;
-            bottom: 15px;
-            top: auto;
         }
         
         .checker {
-            width: 44px;
-            height: 44px;
+            width: 52px;
+            height: 52px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 5px 12px rgba(0,0,0,0.7), inset -2px -2px 4px rgba(0,0,0,0.4), inset 2px 2px 4px rgba(255,255,255,0.2);
+            box-shadow: 
+                0 8px 20px rgba(0,0,0,0.85),
+                inset -3px -3px 8px rgba(0,0,0,0.6),
+                inset 2px 2px 8px rgba(255,255,255,0.2),
+                inset 0 0 10px rgba(0,0,0,0.5);
             cursor: grab;
             pointer-events: auto;
-            transition: transform 0.15s ease;
+            transition: transform 0.12s ease;
+            position: relative;
+            margin: -12px 0;
+        }
+        
+        .checker:hover {
+            transform: scale(1.1) translateY(-2px);
+            box-shadow: 
+                0 10px 25px rgba(0,0,0,0.9),
+                inset -3px -3px 8px rgba(0,0,0,0.6),
+                inset 2px 2px 8px rgba(255,255,255,0.3);
         }
         
         .checker:active {
             cursor: grabbing;
+            box-shadow: 
+                0 3px 8px rgba(0,0,0,0.8),
+                inset -3px -3px 8px rgba(0,0,0,0.6),
+                inset 2px 2px 8px rgba(255,255,255,0.2);
         }
         
         .white {
-            background: radial-gradient(circle at 30% 30%, #fefdfb 0%, #e8dcc0 30%, #d4b896 100%);
-            border: 2px solid #c9a961;
+            background: radial-gradient(circle at 35% 35%, #fcfaf6 0%, #ede4c8 22%, #dcc9a3 50%, #cdb87f 100%);
+            border: 4px solid #b39f6f;
         }
         
         .black {
-            background: radial-gradient(circle at 30% 30%, #2a2a2a 0%, #0f0f0f 60%, #000 100%);
-            border: 2px solid #555;
+            background: radial-gradient(circle at 35% 35%, #3f3f2f 0%, #1f1f15 28%, #0a0a06 60%, #000000 100%);
+            border: 4px solid #2a2a1a;
         }
         
         .point-label {
             position: absolute;
-            bottom: 2px;
-            font-size: 0.65rem;
+            font-size: 0.55rem;
             font-weight: bold;
-            color: #888;
+            color: rgba(0,0,0,0.25);
             z-index: 4;
+            bottom: 3px;
+            letter-spacing: 0.5px;
         }
         
-        .bottom-half .point-label {
-            top: 2px;
+        .top-half .point-label {
+            top: 3px;
             bottom: auto;
         }
         
@@ -329,51 +365,31 @@
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
             
-            // Create wrapper divs for top and bottom halves
-            const topHalf = document.createElement('div');
-            topHalf.className = 'top-half';
-            topHalf.style.gridColumn = '1 / -1';
-            topHalf.style.display = 'grid';
-            topHalf.style.gridTemplateColumns = 'repeat(12, 1fr)';
-            topHalf.style.gap = '3px';
-            topHalf.style.height = '180px';
-            
-            const bottomHalf = document.createElement('div');
-            bottomHalf.className = 'bottom-half';
-            bottomHalf.style.gridColumn = '1 / -1';
-            bottomHalf.style.display = 'grid';
-            bottomHalf.style.gridTemplateColumns = 'repeat(12, 1fr)';
-            bottomHalf.style.gap = '3px';
-            bottomHalf.style.height = '180px';
-            
             // Top row: points 24-13 (right to left)
+            const topRow = document.createElement('div');
+            topRow.className = 'board-row top-half';
             for(let i=23; i>=12; i--) {
-                topHalf.appendChild(createPoint(i, true));
+                topRow.appendChild(createPoint(i));
             }
+            boardDiv.appendChild(topRow);
             
             // Bottom row: points 1-12 (left to right)
+            const bottomRow = document.createElement('div');
+            bottomRow.className = 'board-row bottom-half';
             for(let i=0; i<12; i++) {
-                bottomHalf.appendChild(createPoint(i, false));
+                bottomRow.appendChild(createPoint(i));
             }
-            
-            boardDiv.appendChild(topHalf);
-            boardDiv.appendChild(bottomHalf);
+            boardDiv.appendChild(bottomRow);
             
             document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
         }
         
-        function createPoint(i, isTop) {
+        function createPoint(i) {
             const pt = document.createElement('div');
             pt.className = 'point';
+            if(i % 2 === 0) pt.classList.add('light');
             pt.setAttribute('data-index', i);
             
-            // Create triangle shape
-            const shapeDiv = document.createElement('div');
-            shapeDiv.className = 'point-shape';
-            if(i % 2 === 1) shapeDiv.classList.add('alt');
-            pt.appendChild(shapeDiv);
-            
-            // Create checkers container
             const checkersDiv = document.createElement('div');
             checkersDiv.className = 'checkers';
             
@@ -389,7 +405,6 @@
             
             pt.appendChild(checkersDiv);
             
-            // Add label
             const label = document.createElement('div');
             label.className = 'point-label';
             label.textContent = i+1;
