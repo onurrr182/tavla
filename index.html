@@ -31,28 +31,51 @@
             max-width: 95vw;
             margin: 30px auto;
             background: linear-gradient(90deg, 
-                #7A6B52 0%,
-                #8B7355 8%,
-                #7A6B52 12%,
-                #9D8B72 18%,
-                #8B7355 24%,
-                #7A6B52 28%,
-                #8B7355 35%,
-                #7A6B52 40%,
-                #9D8B72 46%,
-                #8B7355 52%,
-                #7A6B52 56%,
-                #8B7355 63%,
-                #7A6B52 68%,
-                #9D8B72 74%,
-                #8B7355 80%,
-                #7A6B52 84%,
-                #8B7355 92%,
-                #7A6B52 100%
+                #8B7355 0%,
+                #9D8B72 2.5%,
+                #7A6B52 5%,
+                #8B7355 7.5%,
+                #A89470 10%,
+                #8B7355 12.5%,
+                #9D8B72 15%,
+                #7A6B52 17.5%,
+                #8B7355 20%,
+                #A89470 22.5%,
+                #8B7355 25%,
+                #9D8B72 27.5%,
+                #7A6B52 30%,
+                #8B7355 32.5%,
+                #A89470 35%,
+                #8B7355 37.5%,
+                #9D8B72 40%,
+                #7A6B52 42.5%,
+                #8B7355 45%,
+                #A89470 47.5%,
+                #8B7355 50%,
+                #9D8B72 52.5%,
+                #7A6B52 55%,
+                #8B7355 57.5%,
+                #A89470 60%,
+                #8B7355 62.5%,
+                #9D8B72 65%,
+                #7A6B52 67.5%,
+                #8B7355 70%,
+                #A89470 72.5%,
+                #8B7355 75%,
+                #9D8B72 77.5%,
+                #7A6B52 80%,
+                #8B7355 82.5%,
+                #A89470 85%,
+                #8B7355 87.5%,
+                #9D8B72 90%,
+                #7A6B52 92.5%,
+                #8B7355 95%,
+                #A89470 97.5%,
+                #8B7355 100%
             );
             padding: 15px;
             border-radius: 0;
-            border: 22px solid #54483d;
+            border: 24px solid #54483d;
             box-shadow: 0 40px 100px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,255,255,0.03);
             display: flex;
             flex-direction: column;
@@ -62,7 +85,7 @@
         .board-row {
             display: flex;
             gap: 0;
-            height: 220px;
+            height: 240px;
             flex: 1;
             position: relative;
         }
@@ -76,44 +99,20 @@
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
+            overflow: hidden;
+            background: transparent;
         }
         
-        /* Create triangle using borders */
-        .point::before {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 0;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1;
+        .triangle-svg {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
         
-        .top-half .point::before {
-            border-left: 28px solid transparent;
-            border-right: 28px solid transparent;
-            border-top: 190px solid;
+        .point:hover .triangle-svg {
+            filter: drop-shadow(0 4px 8px rgba(212,175,55,0.5)) brightness(1.1);
         }
         
-        .bottom-half .point::before {
-            border-left: 28px solid transparent;
-            border-right: 28px solid transparent;
-            border-bottom: 190px solid;
-            bottom: 0;
-            top: auto;
-        }
-        
-        /* Dark triangles (odd positions) */
-        .point:nth-child(odd)::before {
-            border-top-color: #654321;
-            border-bottom-color: #654321;
-        }
-        
-        /* Light triangles (even positions) */
-        .point:nth-child(even)::before {
-            border-top-color: #D2A679;
-            border-bottom-color: #D2A679;
+        .point.selected .triangle-svg {
+            filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.9)) brightness(1.2);
         }
         
         .checkers {
@@ -135,29 +134,29 @@
         }
         
         .checker {
-            width: 54px;
-            height: 54px;
+            width: 58px;
+            height: 58px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 
-                0 8px 16px rgba(0,0,0,0.8),
-                inset -2px -2px 4px rgba(0,0,0,0.5),
-                inset 2px 2px 4px rgba(255,255,255,0.15);
+                0 10px 20px rgba(0,0,0,0.7),
+                inset -2px -2px 5px rgba(0,0,0,0.4),
+                inset 2px 2px 5px rgba(255,255,255,0.1);
             cursor: grab;
             pointer-events: auto;
             transition: transform 0.15s ease;
             position: relative;
-            margin: -15px 0;
+            margin: -20px 0;
         }
         
         .checker:hover {
             transform: scale(1.12) translateY(-3px);
             box-shadow: 
-                0 12px 24px rgba(0,0,0,0.9),
-                inset -2px -2px 4px rgba(0,0,0,0.5),
-                inset 2px 2px 4px rgba(255,255,255,0.2);
+                0 14px 28px rgba(0,0,0,0.8),
+                inset -2px -2px 5px rgba(0,0,0,0.4),
+                inset 2px 2px 5px rgba(255,255,255,0.15);
         }
         
         .checker:active {
@@ -165,13 +164,21 @@
         }
         
         .white {
-            background: radial-gradient(circle at 35% 35%, #FFFAF0 0%, #F5E6D3 25%, #E0CCAD 55%, #D4B896 100%);
-            border: 4px solid #C9A961;
+            background: radial-gradient(circle at 35% 35%, #FFFAF0 0%, #F5E6D3 20%, #E0CCAD 50%, #D4B896 85%, #C9A961 100%);
+            border: 5px solid #B39F6F;
+            box-shadow: 
+                0 6px 12px rgba(0,0,0,0.4),
+                inset -1px -1px 3px rgba(0,0,0,0.2),
+                inset 1px 1px 3px rgba(255,255,255,0.4);
         }
         
         .black {
-            background: radial-gradient(circle at 35% 35%, #3a3a2a 0%, #1a1a10 35%, #0a0a00 70%, #000000 100%);
-            border: 4px solid #1a1a0a;
+            background: radial-gradient(circle at 35% 35%, #4a4a3a 0%, #252517 30%, #0f0f08 65%, #000000 100%);
+            border: 5px solid #1a1a0a;
+            box-shadow: 
+                0 6px 12px rgba(0,0,0,0.6),
+                inset -1px -1px 3px rgba(0,0,0,0.4),
+                inset 1px 1px 3px rgba(255,255,255,0.1);
         }
         
         .point-label {
@@ -374,7 +381,7 @@
             const topRow = document.createElement('div');
             topRow.className = 'board-row top-half';
             for(let i=23; i>=12; i--) {
-                topRow.appendChild(createPoint(i));
+                topRow.appendChild(createPoint(i, true));
             }
             boardDiv.appendChild(topRow);
             
@@ -382,18 +389,69 @@
             const bottomRow = document.createElement('div');
             bottomRow.className = 'board-row bottom-half';
             for(let i=0; i<12; i++) {
-                bottomRow.appendChild(createPoint(i));
+                bottomRow.appendChild(createPoint(i, false));
             }
             boardDiv.appendChild(bottomRow);
             
             document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
         }
         
-        function createPoint(i) {
+        function createPoint(i, isTopHalf) {
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
             
+            // Determine colors based on position
+            const isDark = i % 2 === 1;
+            const darkColors = ['#8B7355', '#7A6B52', '#9D8B72', '#A89470'];
+            const lightColors = ['#D4B896', '#C9A96A', '#E0CCAD', '#DCC8A8'];
+            const colors = isDark ? darkColors : lightColors;
+            
+            // Create SVG triangle with wood grain stripes
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 100 240');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            svg.setAttribute('style', 'position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1;');
+            
+            // Draw background triangle
+            const bgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) {
+                bgPath.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            } else {
+                bgPath.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            }
+            bgPath.setAttribute('fill', colors[0]);
+            bgPath.setAttribute('stroke', 'none');
+            svg.appendChild(bgPath);
+            
+            // Draw vertical wood grain stripes
+            const stripeWidth = 100 / (colors.length * 1.5);
+            for(let j = 1; j < colors.length; j++) {
+                const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                stripe.setAttribute('x', j * stripeWidth);
+                stripe.setAttribute('y', '0');
+                stripe.setAttribute('width', stripeWidth * 0.8);
+                stripe.setAttribute('height', '240');
+                stripe.setAttribute('fill', colors[j]);
+                stripe.setAttribute('opacity', '0.9');
+                svg.appendChild(stripe);
+            }
+            
+            // Draw triangle outline
+            const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if(isTopHalf) {
+                outline.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
+            } else {
+                outline.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
+            }
+            outline.setAttribute('fill', 'none');
+            outline.setAttribute('stroke', 'rgba(0,0,0,0.2)');
+            outline.setAttribute('stroke-width', '0.5');
+            svg.appendChild(outline);
+            
+            pt.appendChild(svg);
+            
+            // Create checkers container
             const checkersDiv = document.createElement('div');
             checkersDiv.className = 'checkers';
             
