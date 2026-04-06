@@ -29,49 +29,50 @@
         #board {
             display: flex;
             flex-direction: column;
-            width: 900px;
+            width: 1000px;
             max-width: 98vw;
-            margin: 40px auto;
-            background: linear-gradient(180deg, #1a1a2e 0%, #2a2a3e 50%, #1a1a2e 100%);
-            padding: 20px;
-            border-radius: 4px;
-            box-shadow: 0 30px 80px rgba(0,0,0,0.8), inset 0 1px 2px rgba(212, 175, 55, 0.1);
-            border: 3px solid #d4af37;
-            gap: 8px;
+            margin: 30px auto;
+            background: linear-gradient(to right, #8B7355 0%, #A0826D 50%, #8B7355 100%);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.15);
+            border: 12px solid #5d4e37;
+            gap: 0;
         }
         .board-row {
             display: flex;
-            gap: 8px;
+            gap: 2px;
             justify-content: center;
-            position: relative;
+            height: 160px;
         }
         .point {
-            position: relative;
-            width: 50px;
-            height: 140px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            clip-path: polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%);
             display: flex;
-            align-items: center;
-            justify-content: center;
             flex-direction: column;
-            font-weight: bold;
-            font-size: 0.7rem;
-            color: #888;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 48px;
+            height: 160px;
+            position: relative;
         }
-        .point:nth-child(odd) {
-            background: linear-gradient(135deg, #2d3561 0%, #1f2642 100%);
+        .point-triangle {
+            width: 0;
+            height: 0;
+            border-left: 24px solid transparent;
+            border-right: 24px solid transparent;
+            border-top: 120px solid rgba(0, 0, 0, 0.3);
         }
-        .point:nth-child(even) {
-            background: linear-gradient(135deg, #3a4575 0%, #2a3555 100%);
+        .point:nth-child(odd) .point-triangle {
+            border-top-color: rgba(60, 40, 20, 0.4);
         }
-        .point:hover {
-            filter: brightness(1.2);
+        .point:nth-child(even) .point-triangle {
+            border-top-color: rgba(40, 25, 10, 0.5);
         }
-        .point.selected {
-            filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.8));
-            transform: scale(1.08);
+        .point:hover .point-triangle {
+            filter: brightness(1.3);
+        }
+        .point.selected .point-triangle {
+            filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.9));
         }
         .point small {
             position: absolute;
