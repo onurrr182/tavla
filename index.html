@@ -54,13 +54,17 @@
             width: 48px;
             height: 160px;
             position: relative;
+            flex-shrink: 0;
         }
         .point-triangle {
             width: 0;
             height: 0;
             border-left: 24px solid transparent;
             border-right: 24px solid transparent;
-            border-top: 120px solid rgba(0, 0, 0, 0.3);
+            border-top: 120px solid rgba(60, 40, 20, 0.4);
+            position: absolute;
+            bottom: 0;
+            z-index: 1;
         }
         .point:nth-child(odd) .point-triangle {
             border-top-color: rgba(60, 40, 20, 0.4);
@@ -74,13 +78,6 @@
         .point.selected .point-triangle {
             filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.9));
         }
-        .point small {
-            position: absolute;
-            bottom: 3px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            color: #666;
-        }
         .checker-container {
             display: flex;
             flex-direction: column;
@@ -91,6 +88,7 @@
             top: 0;
             width: 100%;
             pointer-events: none;
+            z-index: 10;
         }
         .checker {
             width: 44px;
@@ -287,20 +285,27 @@
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
             
-            // Top row: points 13-24 (right to left)
+            // Top row: points 13-24 (right to left) - pointing DOWN
             const topRow = document.createElement('div');
             topRow.className = 'board-row';
             for(let i=23; i>=12; i--) {
-                const pt = createPoint(i);
-                topRow.appendChild(pt);
+                topRow.appendChild(createPoint(i, true));
             }
             boardDiv.appendChild(topRow);
             
-            // Status update
+            // Bottom row: points 1-12 (left to right) - pointing UP  
+            const bottomRow = document.createElement('div');
+            bottomRow.className = 'board-row';
+            for(let i=0; i<12; i++) {
+                bottomRow.appendChild(createPoint(i, false));
+            }
+            boardDiv.appendChild(bottomRow);
+            
+            // Update status
             document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
         }
 
-        function createPoint(i) {
+        function createPoint(i, pointsDown) {
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
@@ -308,11 +313,29 @@
             // Create triangle
             const triangle = document.createElement('div');
             triangle.className = 'point-triangle';
+            if(!pointsDown) {
+                triangle.style.borderTop = 'none';
+                triangle.style.borderBottom = '120px solid rgba(0, 0, 0, 0.3)';
+                if(i % 2 === 0) {
+                    triangle.style.borderBottomColor = 'rgba(60, 40, 20, 0.4)';
+                } else {
+                    triangle.style.borderBottomColor = 'rgba(40, 25, 10, 0.5)';
+                }
+            } else {
+                if(i % 2 === 0) {
+                    triangle.style.borderTopColor = 'rgba(60, 40, 20, 0.4)';
+                } else {
+                    triangle.style.borderTopColor = 'rgba(40, 25, 10, 0.5)';
+                }
+            }
             pt.appendChild(triangle);
             
             // Create checker container
             const container = document.createElement('div');
             container.className = 'checker-container';
+            if(!pointsDown) {
+                container.style.flexDirection = 'column-reverse';
+            }
             
             const val = gameState.board[i];
             const count = Math.abs(val);
