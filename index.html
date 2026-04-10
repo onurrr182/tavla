@@ -4,352 +4,711 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Backgammon P2P</title>
+    <meta name="description" content="Play Backgammon online with friends via peer-to-peer connection. No server needed.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        
+        :root {
+            --board-bg: #1a150f;
+            --frame-color: #3d2e1f;
+            --frame-highlight: #5a4530;
+            --felt-green: #1a5c3a;
+            --felt-dark: #0f3d25;
+            --gold: #d4af37;
+            --gold-light: #f0d060;
+            --gold-dim: #a8882c;
+            --tri-dark: #8B1A1A;
+            --tri-dark-shadow: #6b1010;
+            --tri-light: #F5F0E1;
+            --tri-light-shadow: #d5ccb5;
+            --checker-white: #F5F0E6;
+            --checker-white-rim: #c8bfa8;
+            --checker-black: #1a1a18;
+            --checker-black-rim: #3a3a35;
+            --bar-width: 52px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: 'Arial', sans-serif;
-            text-align: center;
-            background: #2a2420;
-            color: white;
-            padding: 15px;
-            margin: 0;
-            min-height: 100vh;
-        }
-        
-        h1 {
-            font-size: 2.5rem;
-            margin: 10px 0 20px;
-            color: #d4af37;
-            font-weight: 300;
-            letter-spacing: 2px;
-        }
-        
-        #board {
-            width: 900px;
-            max-width: 95vw;
-            margin: 30px auto;
-            background: linear-gradient(90deg, 
-                #8B7355 0%,
-                #9D8B72 2.5%,
-                #7A6B52 5%,
-                #8B7355 7.5%,
-                #A89470 10%,
-                #8B7355 12.5%,
-                #9D8B72 15%,
-                #7A6B52 17.5%,
-                #8B7355 20%,
-                #A89470 22.5%,
-                #8B7355 25%,
-                #9D8B72 27.5%,
-                #7A6B52 30%,
-                #8B7355 32.5%,
-                #A89470 35%,
-                #8B7355 37.5%,
-                #9D8B72 40%,
-                #7A6B52 42.5%,
-                #8B7355 45%,
-                #A89470 47.5%,
-                #8B7355 50%,
-                #9D8B72 52.5%,
-                #7A6B52 55%,
-                #8B7355 57.5%,
-                #A89470 60%,
-                #8B7355 62.5%,
-                #9D8B72 65%,
-                #7A6B52 67.5%,
-                #8B7355 70%,
-                #A89470 72.5%,
-                #8B7355 75%,
-                #9D8B72 77.5%,
-                #7A6B52 80%,
-                #8B7355 82.5%,
-                #A89470 85%,
-                #8B7355 87.5%,
-                #9D8B72 90%,
-                #7A6B52 92.5%,
-                #8B7355 95%,
-                #A89470 97.5%,
-                #8B7355 100%
-            );
-            padding: 15px;
-            border-radius: 0;
-            border: 24px solid #54483d;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,255,255,0.03);
+            font-family: 'Inter', sans-serif;
+            background: var(--board-bg);
+            background-image:
+                radial-gradient(ellipse at 50% 30%, rgba(60,45,25,0.6) 0%, transparent 70%),
+                url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            color: #e8e0d4;
             display: flex;
             flex-direction: column;
-            gap: 0;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 16px;
+            overflow-x: hidden;
         }
-        
+
+        /* ── Title ── */
+        .game-title {
+            font-family: 'Cinzel', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--gold);
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            text-shadow: 0 2px 12px rgba(212,175,55,0.3);
+        }
+
+        /* ── Setup Screen ── */
+        #setup {
+            background: linear-gradient(145deg, #2a221a 0%, #1e1812 100%);
+            padding: 40px 48px;
+            border-radius: 16px;
+            max-width: 420px;
+            width: 100%;
+            border: 1px solid rgba(212,175,55,0.2);
+            box-shadow:
+                0 24px 80px rgba(0,0,0,0.7),
+                inset 0 1px 0 rgba(255,255,255,0.04);
+            text-align: center;
+        }
+
+        #setup .subtitle {
+            font-size: 0.85rem;
+            color: #8a7e6e;
+            margin-bottom: 24px;
+            letter-spacing: 1px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 20px 0;
+            color: #5a5040;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #5a5040, transparent);
+        }
+
+        input {
+            padding: 12px 16px;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 1.5px solid rgba(212,175,55,0.25);
+            background: rgba(212,175,55,0.05);
+            color: var(--gold-light);
+            width: 100%;
+            font-family: 'Inter', monospace;
+            letter-spacing: 4px;
+            text-align: center;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--gold);
+            background: rgba(212,175,55,0.1);
+            box-shadow: 0 0 20px rgba(212,175,55,0.15);
+        }
+        input::placeholder {
+            color: rgba(212,175,55,0.25);
+            letter-spacing: 1px;
+        }
+
+        button {
+            padding: 12px 32px;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+            color: #1a1208;
+            box-shadow: 0 4px 20px rgba(212,175,55,0.3);
+            width: 100%;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(212,175,55,0.45);
+        }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--gold);
+            border: 1.5px solid rgba(212,175,55,0.3);
+            width: 100%;
+        }
+        .btn-secondary:hover {
+            background: rgba(212,175,55,0.08);
+            border-color: var(--gold);
+        }
+
+        .btn-sm {
+            padding: 8px 20px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+
+        /* ── Game Container ── */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 860px;
+        }
+
+        /* ── HUD (compact info bar above board) ── */
+        .hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 820px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, rgba(42,34,26,0.95), rgba(30,24,18,0.95));
+            border-radius: 10px;
+            border: 1px solid rgba(212,175,55,0.12);
+            backdrop-filter: blur(8px);
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .hud-id {
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            color: var(--gold);
+            letter-spacing: 2px;
+        }
+        .hud-id span {
+            color: #8a7e6e;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.75rem;
+            letter-spacing: 0;
+            margin-right: 4px;
+        }
+
+        .hud-status {
+            font-size: 0.78rem;
+            color: #8a7e6e;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hud-status .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #555;
+            transition: background 0.3s;
+        }
+        .hud-status .dot.connected {
+            background: #4caf50;
+            box-shadow: 0 0 6px rgba(76,175,80,0.5);
+        }
+
+        .hud-turn {
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            color: var(--gold-light);
+            letter-spacing: 1px;
+        }
+
+        /* ── Dice Area ── */
+        .dice-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .die {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(145deg, #F5F0E1 0%, #E5DCC8 100%);
+            border-radius: 7px;
+            display: grid;
+            place-items: center;
+            box-shadow:
+                0 3px 8px rgba(0,0,0,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.6),
+                inset 0 0 8px rgba(0,0,0,0.06);
+            position: relative;
+            transition: transform 0.3s ease;
+        }
+        .die.rolling {
+            animation: diceRoll 0.4s ease-out;
+        }
+        @keyframes diceRoll {
+            0% { transform: rotateX(0deg) rotateZ(0deg) scale(0.8); }
+            50% { transform: rotateX(180deg) rotateZ(90deg) scale(1.1); }
+            100% { transform: rotateX(360deg) rotateZ(0deg) scale(1); }
+        }
+
+        .die-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #2a1a0a;
+            box-shadow: inset 0 1px 1px rgba(0,0,0,0.4);
+            position: absolute;
+        }
+
+        /* Dot positions for each die face */
+        .die[data-value="1"] .d-c { top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .die[data-value="2"] .d-tr { top: 7px; right: 7px; }
+        .die[data-value="2"] .d-bl { bottom: 7px; left: 7px; }
+        .die[data-value="3"] .d-tr { top: 7px; right: 7px; }
+        .die[data-value="3"] .d-c { top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .die[data-value="3"] .d-bl { bottom: 7px; left: 7px; }
+        .die[data-value="4"] .d-tl { top: 7px; left: 7px; }
+        .die[data-value="4"] .d-tr { top: 7px; right: 7px; }
+        .die[data-value="4"] .d-bl { bottom: 7px; left: 7px; }
+        .die[data-value="4"] .d-br { bottom: 7px; right: 7px; }
+        .die[data-value="5"] .d-tl { top: 7px; left: 7px; }
+        .die[data-value="5"] .d-tr { top: 7px; right: 7px; }
+        .die[data-value="5"] .d-c { top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .die[data-value="5"] .d-bl { bottom: 7px; left: 7px; }
+        .die[data-value="5"] .d-br { bottom: 7px; right: 7px; }
+        .die[data-value="6"] .d-tl { top: 7px; left: 7px; }
+        .die[data-value="6"] .d-tr { top: 7px; right: 7px; }
+        .die[data-value="6"] .d-ml { top: 50%; left: 7px; transform: translateY(-50%); }
+        .die[data-value="6"] .d-mr { top: 50%; right: 7px; transform: translateY(-50%); }
+        .die[data-value="6"] .d-bl { bottom: 7px; left: 7px; }
+        .die[data-value="6"] .d-br { bottom: 7px; right: 7px; }
+
+        .roll-btn {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+            color: #1a1208;
+            border: none;
+            padding: 8px 18px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            box-shadow: 0 3px 12px rgba(212,175,55,0.25);
+            transition: all 0.25s;
+        }
+        .roll-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 18px rgba(212,175,55,0.4);
+        }
+        .roll-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── Board ── */
+        #board {
+            width: 100%;
+            max-width: 820px;
+            aspect-ratio: 1.55 / 1;
+            background: var(--felt-green);
+            background-image:
+                radial-gradient(ellipse at 50% 50%, rgba(30,100,60,0.3) 0%, transparent 70%),
+                url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.06'/%3E%3C/svg%3E");
+            border-radius: 6px;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+            border: 16px solid var(--frame-color);
+            border-image: linear-gradient(
+                145deg,
+                #5a4530 0%,
+                #3d2e1f 20%,
+                #50402e 40%,
+                #3d2e1f 60%,
+                #5a4530 80%,
+                #3d2e1f 100%
+            ) 16;
+            box-shadow:
+                0 30px 80px rgba(0,0,0,0.8),
+                0 0 0 2px rgba(90,69,48,0.5),
+                inset 0 0 30px rgba(0,0,0,0.3);
+        }
+
+        /* Board halves (left + right) */
+        .board-half {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Center Bar */
+        .board-bar {
+            width: var(--bar-width);
+            background: linear-gradient(180deg,
+                #4a3828 0%, #3d2e1f 15%,
+                #50402e 50%,
+                #3d2e1f 85%, #4a3828 100%
+            );
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            box-shadow:
+                inset 2px 0 4px rgba(0,0,0,0.3),
+                inset -2px 0 4px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        .board-bar::before, .board-bar::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #5a4530, #6b5440, #5a4530);
+        }
+        .board-bar::before { top: 0; }
+        .board-bar::after { bottom: 0; }
+
+        .bar-checkers {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .bar-checker {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        }
+
+        /* Board rows (top and bottom) */
         .board-row {
             display: flex;
-            gap: 0;
-            height: 240px;
             flex: 1;
             position: relative;
         }
-        
+
+        /* ── Points (triangles) ── */
         .point {
             flex: 1;
             position: relative;
             cursor: pointer;
-            transition: filter 0.2s ease;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            overflow: hidden;
-            background: transparent;
-            border-right: 1px solid #3a3a30;
+            overflow: visible;
+            transition: filter 0.2s ease;
         }
-        
-        .triangle-svg {
+
+        .point-triangle {
             position: absolute;
             top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            left: 8%;
+            right: 8%;
+            height: 88%;
             z-index: 1;
         }
-        
-        .point:hover .triangle-svg {
-            filter: drop-shadow(0 4px 8px rgba(212,175,55,0.5)) brightness(1.1);
+
+        .bottom-half .point-triangle {
+            top: auto;
+            bottom: 0;
         }
-        
-        .point.selected .triangle-svg {
-            filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.9)) brightness(1.2);
+
+        .point-triangle svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
         }
-        
-        .checkers {
+
+        .point:hover .point-triangle svg {
+            filter: drop-shadow(0 0 8px rgba(212,175,55,0.35)) brightness(1.08);
+        }
+
+        .point.selected .point-triangle svg {
+            filter: drop-shadow(0 0 14px rgba(212,175,55,0.7)) brightness(1.15);
+        }
+
+        .point.valid-target .point-triangle svg {
+            filter: drop-shadow(0 0 10px rgba(100,200,100,0.6)) brightness(1.1);
+        }
+
+        /* Point numbers */
+        .point-num {
+            position: absolute;
+            font-size: 0.6rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.3);
+            z-index: 30;
+            pointer-events: none;
+            font-family: 'Inter', sans-serif;
+        }
+        .top-half .point-num { bottom: 3px; }
+        .bottom-half .point-num { top: 3px; }
+
+        /* ── Checkers ── */
+        .checkers-stack {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0;
-            width: 50px;
-            pointer-events: none;
             position: relative;
             z-index: 20;
-            margin-top: 8px;
+            pointer-events: none;
+            padding-top: 4px;
         }
-        
-        .bottom-half .checkers {
+
+        .bottom-half .checkers-stack {
             flex-direction: column-reverse;
-            margin-top: 0;
-            margin-bottom: 8px;
+            padding-top: 0;
+            padding-bottom: 4px;
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
         }
-        
+        .top-half .checkers-stack {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
         .checker {
-            width: 58px;
-            height: 58px;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 10px 18px rgba(0,0,0,0.55);
+            position: relative;
             cursor: grab;
             pointer-events: auto;
             transition: transform 0.15s ease, box-shadow 0.15s ease;
-            position: relative;
-            margin: -20px 0;
-            border: 1px solid rgba(0,0,0,0.25);
+            flex-shrink: 0;
         }
-        
+
+        .checker + .checker {
+            margin-top: -8px;
+        }
+        .bottom-half .checker + .checker {
+            margin-top: 0;
+            margin-bottom: -8px;
+        }
+
         .checker:hover {
-            transform: scale(1.12) translateY(-3px);
-            box-shadow: 
-                0 14px 28px rgba(0,0,0,0.8),
-                inset -2px -2px 6px rgba(0,0,0,0.18);
+            transform: scale(1.1);
+            z-index: 25;
         }
-
-        .checker.white {
-            background: radial-gradient(circle at 35% 25%, #ffffff 0%, #f1f1f1 40%, #dcdcdc 100%);
-        }
-
-        .checker.black {
-            background: radial-gradient(circle at 35% 25%, #222222 0%, #111111 45%, #000000 100%);
-        }
-        
         .checker:active {
             cursor: grabbing;
         }
-        
-        .white {
-            background: radial-gradient(circle at 35% 35%, #FFFAF0 0%, #F5E6D3 20%, #E0CCAD 50%, #D4B896 85%, #C9A961 100%);
-            border: 5px solid #B39F6F;
-            box-shadow: 
-                0 6px 12px rgba(0,0,0,0.4),
-                inset -1px -1px 3px rgba(0,0,0,0.2),
-                inset 1px 1px 3px rgba(255,255,255,0.4);
+
+        .checker.white-checker {
+            background: radial-gradient(circle at 38% 32%,
+                #FFFDF8 0%,
+                #F5F0E6 30%,
+                #E8DFC8 60%,
+                #D8CCAC 100%
+            );
+            border: 2px solid var(--checker-white-rim);
+            box-shadow:
+                0 3px 8px rgba(0,0,0,0.45),
+                inset 0 2px 4px rgba(255,255,255,0.5),
+                inset 0 -2px 4px rgba(0,0,0,0.1);
         }
-        
-        .black {
-            background: radial-gradient(circle at 35% 35%, #4a4a3a 0%, #252517 30%, #0f0f08 65%, #000000 100%);
-            border: 5px solid #1a1a0a;
-            box-shadow: 
-                0 6px 12px rgba(0,0,0,0.6),
-                inset -1px -1px 3px rgba(0,0,0,0.4),
-                inset 1px 1px 3px rgba(255,255,255,0.1);
-        }
-        
-        .point-label {
+        .checker.white-checker::after {
+            content: '';
             position: absolute;
-            font-size: 0.5rem;
-            font-weight: bold;
-            color: rgba(255,255,255,0.15);
-            z-index: 25;
-            bottom: 2px;
+            top: 6px;
+            left: 8px;
+            width: 16px;
+            height: 10px;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.6), transparent);
+            border-radius: 50%;
         }
-        
-        .top-half .point-label {
-            top: 2px;
-            bottom: auto;
+
+        .checker.black-checker {
+            background: radial-gradient(circle at 38% 32%,
+                #3a3a35 0%,
+                #252520 30%,
+                #1a1a18 60%,
+                #0a0a08 100%
+            );
+            border: 2px solid var(--checker-black-rim);
+            box-shadow:
+                0 3px 8px rgba(0,0,0,0.6),
+                inset 0 2px 4px rgba(255,255,255,0.08),
+                inset 0 -2px 4px rgba(0,0,0,0.3);
         }
-        
-        #setup, #game-info {
-            background: linear-gradient(135deg, #2a2a3a 0%, #3a3a4a 100%);
-            padding: 30px;
-            border-radius: 8px;
-            max-width: 380px;
-            margin: 30px auto;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-            border: 3px solid #d4af37;
+        .checker.black-checker::after {
+            content: '';
+            position: absolute;
+            top: 6px;
+            left: 8px;
+            width: 16px;
+            height: 10px;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.12), transparent);
+            border-radius: 50%;
         }
-        
-        #setup p, #game-info p {
-            margin: 12px 0;
-            font-size: 0.95rem;
+
+        /* Checker count badge (when > 5 stacked) */
+        .checker-count {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.7rem;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            pointer-events: none;
+            z-index: 26;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
-        
-        #display-id {
-            color: #d4af37;
-            font-family: monospace;
-            letter-spacing: 1px;
-            font-size: 1.1rem;
+        .white-checker .checker-count { color: #3a3020; }
+        .black-checker .checker-count { color: #e0d8c8; }
+
+        /* ── Bearing off trays ── */
+        .bearing-tray {
+            width: 36px;
+            background: linear-gradient(180deg, #3d321f 0%, #2e2418 50%, #3d321f 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 0;
+            gap: 2px;
+            box-shadow: inset 2px 0 4px rgba(0,0,0,0.3);
         }
-        
-        #status {
-            color: #aaa;
-            font-size: 0.9rem;
-        }
-        
-        #dice-container {
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 6px;
-            border: 1px solid #d4af3755;
-        }
-        
-        #dice-val {
-            display: block;
-            font-size: 1.5rem;
-            margin-top: 10px;
-            color: #d4af37;
-            letter-spacing: 2px;
-            font-weight: bold;
-        }
-        
-        input {
-            padding: 10px 12px;
-            font-size: 0.95rem;
+
+        .bearing-chip {
+            width: 28px;
+            height: 8px;
             border-radius: 4px;
-            border: 2px solid #d4af37;
-            background: rgba(212, 175, 55, 0.08);
-            color: white;
-            transition: all 0.3s ease;
-            width: 100%;
-            max-width: 250px;
-            margin: 10px auto;
-            text-transform: uppercase;
-            font-family: monospace;
-            letter-spacing: 1px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }
-        
-        input:focus {
-            outline: none;
-            border-color: #f0e68c;
-            background: rgba(212, 175, 55, 0.15);
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        .bearing-chip.white-chip {
+            background: linear-gradient(180deg, #F5F0E6, #D8CCAC);
+            border: 1px solid #c8bfa8;
         }
-        
-        input::placeholder {
-            color: rgba(255,255,255,0.3);
+        .bearing-chip.black-chip {
+            background: linear-gradient(180deg, #3a3a35, #1a1a18);
+            border: 1px solid #3a3a35;
         }
-        
-        button {
-            padding: 11px 28px;
-            font-size: 0.95rem;
-            border-radius: 4px;
-            border: 2px solid #d4af37;
-            margin: 8px;
-            cursor: pointer;
-            background: linear-gradient(135deg, #d4af37 0%, #dcc068 100%);
-            color: #1a1410;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.3);
+
+        /* ── Utility ── */
+        .hidden { display: none !important; }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            :root { --bar-width: 36px; }
+            .game-title { font-size: 1.4rem; letter-spacing: 4px; }
+            .checker { width: 32px; height: 32px; }
+            .checker + .checker { margin-top: -5px; }
+            .bottom-half .checker + .checker { margin-bottom: -5px; margin-top: 0; }
+            .die { width: 34px; height: 34px; }
+            .die-dot { width: 6px; height: 6px; }
+            .hud { padding: 8px 12px; }
+            #board { border-width: 10px; }
         }
-        
-        button:hover {
-            background: linear-gradient(135deg, #dcc068 0%, #d4af37 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.45);
+
+        @media (max-width: 600px) {
+            .game-title { font-size: 1.1rem; letter-spacing: 3px; }
+            .checker { width: 28px; height: 28px; }
+            .checker + .checker { margin-top: -4px; }
+            .bottom-half .checker + .checker { margin-bottom: -4px; margin-top: 0; }
+            .hud { flex-wrap: wrap; gap: 8px; justify-content: center; }
         }
-        
-        button:active {
-            transform: translateY(0);
+
+        /* ── Animations ── */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        
-        .point.selected {
-            filter: opacity(1) drop-shadow(0 0 20px rgba(212, 175, 55, 1));
-        }
-        
-        .hidden {
-            display: none;
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+
+        @keyframes pulseGold {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0); }
+            50% { box-shadow: 0 0 0 6px rgba(212,175,55,0.1); }
         }
     </style>
 </head>
 <body>
-    <h1>BACKGAMMON</h1>
-    
+    <h1 class="game-title">TAVLA</h1>
+
+    <!-- ── Setup Screen ── -->
     <div id="setup">
-        <button onclick="createGame()">Create Game (Host)</button>
-        <p>OR</p>
-        <input type="text" id="joinId" placeholder="Enter 4-Letter ID">
-        <button onclick="joinGame()">Join Game</button>
+        <p class="subtitle">Peer-to-Peer Backgammon</p>
+        <button class="btn-primary" onclick="createGame()" id="create-btn">Create Game</button>
+        <div class="divider">or join a friend</div>
+        <input type="text" id="joinId" placeholder="ABCD" maxlength="4">
+        <div style="height:10px"></div>
+        <button class="btn-secondary" onclick="joinGame()" id="join-btn">Join Game</button>
     </div>
-    
-    <div id="game-info" class="hidden">
-        <p>Your ID: <strong id="display-id">...</strong></p>
-        <p id="status">Waiting for player...</p>
-        <div id="dice-container">
-            <button id="roll-btn" onclick="rollDice()">Roll Dice</button>
-            <span id="dice-val"></span>
+
+    <!-- ── Game Area ── -->
+    <div id="game-container" class="hidden">
+        <!-- HUD -->
+        <div class="hud">
+            <div class="hud-left">
+                <div class="hud-status">
+                    <div class="dot" id="conn-dot"></div>
+                    <span id="conn-label">Waiting…</span>
+                </div>
+                <div class="hud-id"><span>ID:</span><span id="display-id">...</span></div>
+            </div>
+            <div class="dice-area">
+                <div class="die" id="die1" data-value="0"></div>
+                <div class="die" id="die2" data-value="0"></div>
+                <button class="roll-btn" id="roll-btn" onclick="rollDice()">Roll</button>
+            </div>
+            <div class="hud-right">
+                <div class="hud-turn" id="turn-label">YOUR TURN</div>
+            </div>
         </div>
+
+        <!-- Board -->
+        <div id="board"></div>
     </div>
-    
-    <div id="board" class="hidden"></div>
-    
+
     <script>
+        /* ── PeerJS & Game State ── */
         let peer, conn;
         let myRole = 'host';
         let gameState = {
-            board: [2,0,0,0,0,-5,0,-3,0,0,0,5,-5,0,0,0,3,0,5,0,0,0,0,-2],
+            // Positive = white (host), negative = black (guest)
+            board: [2,0,0,0,0,-5, 0,-3,0,0,0,5, -5,0,0,0,3,0, 5,0,0,0,0,-2],
             turn: 'host',
-            bar: {white: 0, black: 0}
+            bar: { white: 0, black: 0 },
+            dice: [0, 0],
+            borne: { white: 0, black: 0 }
         };
-        
+
         function createGame() {
-            const id = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const id = generateId();
             initPeer(id);
             myRole = 'host';
             document.getElementById('display-id').innerText = id;
         }
-        
+
         function joinGame() {
-            const id = document.getElementById('joinId').value.toUpperCase();
+            const id = document.getElementById('joinId').value.toUpperCase().trim();
+            if (id.length < 2) return;
             initPeer();
             myRole = 'guest';
             setTimeout(() => {
@@ -357,25 +716,33 @@
                 setupConn();
             }, 1000);
         }
-        
+
+        function generateId() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let id = '';
+            for (let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)];
+            return id;
+        }
+
         function initPeer(id = null) {
             peer = id ? new Peer(id) : new Peer();
-            peer.on('open', (myId) => {
+            peer.on('open', () => {
                 document.getElementById('setup').classList.add('hidden');
-                document.getElementById('game-info').classList.remove('hidden');
-                document.getElementById('board').classList.remove('hidden');
+                document.getElementById('game-container').classList.remove('hidden');
+                document.getElementById('game-container').classList.add('fade-in');
                 renderBoard();
-                if(!id) document.getElementById('display-id').innerText = "Connecting...";
+                if (!id) document.getElementById('display-id').innerText = '…';
             });
             peer.on('connection', (c) => {
                 conn = c;
                 setupConn();
             });
         }
-        
+
         function setupConn() {
             conn.on('open', () => {
-                document.getElementById('status').innerText = "Connected! Game On.";
+                document.getElementById('conn-dot').classList.add('connected');
+                document.getElementById('conn-label').innerText = 'Connected';
                 renderBoard();
             });
             conn.on('data', (data) => {
@@ -383,238 +750,207 @@
                 renderBoard();
             });
         }
-        
+
+        /* ── Dice ── */
+        function rollDice() {
+            if (gameState.turn !== myRole) return;
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            gameState.dice = [d1, d2];
+            renderDie('die1', d1);
+            renderDie('die2', d2);
+            sync();
+        }
+
+        function renderDie(id, value) {
+            const die = document.getElementById(id);
+            die.setAttribute('data-value', value);
+            die.innerHTML = '';
+            die.classList.remove('rolling');
+            void die.offsetWidth; // reflow
+            die.classList.add('rolling');
+
+            const positions = {
+                1: ['c'],
+                2: ['tr', 'bl'],
+                3: ['tr', 'c', 'bl'],
+                4: ['tl', 'tr', 'bl', 'br'],
+                5: ['tl', 'tr', 'c', 'bl', 'br'],
+                6: ['tl', 'tr', 'ml', 'mr', 'bl', 'br']
+            };
+
+            (positions[value] || []).forEach(pos => {
+                const dot = document.createElement('div');
+                dot.className = `die-dot d-${pos}`;
+                die.appendChild(dot);
+            });
+        }
+
+        /* ── Board Rendering ── */
         function renderBoard() {
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
-            console.log('renderBoard called, gameState:', gameState);
-            
-            // Top row: points 24-13 (right to left)
-            const topRow = document.createElement('div');
-            topRow.className = 'board-row top-half';
-            for(let i=23; i>=12; i--) {
-                topRow.appendChild(createPoint(i, true));
+
+            // Left half (points 13-18 top, 7-12 bottom from host perspective)
+            const leftHalf = document.createElement('div');
+            leftHalf.className = 'board-half';
+
+            const topLeft = document.createElement('div');
+            topLeft.className = 'board-row top-half';
+            for (let i = 12; i < 18; i++) topLeft.appendChild(createPoint(i, true));
+
+            const bottomLeft = document.createElement('div');
+            bottomLeft.className = 'board-row bottom-half';
+            for (let i = 11; i >= 6; i--) bottomLeft.appendChild(createPoint(i, false));
+
+            leftHalf.appendChild(topLeft);
+            leftHalf.appendChild(bottomLeft);
+
+            // Center bar
+            const bar = document.createElement('div');
+            bar.className = 'board-bar';
+
+            // Bar checkers
+            const barWhite = document.createElement('div');
+            barWhite.className = 'bar-checkers';
+            for (let n = 0; n < gameState.bar.white; n++) {
+                const c = document.createElement('div');
+                c.className = 'bar-checker white-checker';
+                barWhite.appendChild(c);
             }
-            boardDiv.appendChild(topRow);
-            
-            // Bottom row: points 1-12 (left to right)
-            const bottomRow = document.createElement('div');
-            bottomRow.className = 'board-row bottom-half';
-            for(let i=0; i<12; i++) {
-                bottomRow.appendChild(createPoint(i, false));
+            const barBlack = document.createElement('div');
+            barBlack.className = 'bar-checkers';
+            for (let n = 0; n < gameState.bar.black; n++) {
+                const c = document.createElement('div');
+                c.className = 'bar-checker black-checker';
+                barBlack.appendChild(c);
             }
-            boardDiv.appendChild(bottomRow);
-            
-            console.log('Board rendered with', boardDiv.querySelectorAll('.point').length, 'points');
-            document.getElementById('status').innerText = `Turn: ${gameState.turn.toUpperCase()}`;
+            bar.appendChild(barWhite);
+            bar.appendChild(barBlack);
+
+            // Right half (points 19-24 top, 1-6 bottom)
+            const rightHalf = document.createElement('div');
+            rightHalf.className = 'board-half';
+
+            const topRight = document.createElement('div');
+            topRight.className = 'board-row top-half';
+            for (let i = 18; i < 24; i++) topRight.appendChild(createPoint(i, true));
+
+            const bottomRight = document.createElement('div');
+            bottomRight.className = 'board-row bottom-half';
+            for (let i = 5; i >= 0; i--) bottomRight.appendChild(createPoint(i, false));
+
+            rightHalf.appendChild(topRight);
+            rightHalf.appendChild(bottomRight);
+
+            boardDiv.appendChild(leftHalf);
+            boardDiv.appendChild(bar);
+            boardDiv.appendChild(rightHalf);
+
+            // Update HUD
+            updateHUD();
         }
-        
+
         function createPoint(i, isTopHalf) {
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
 
-            // Photorealistic-ish wood colors
-            const isDark = i % 2 === 1;
-            const darkBase = '#6b4f36';
-            const lightBase = '#e6d3b0';
-            const base = isDark ? darkBase : lightBase;
+            // Triangle
+            const triWrap = document.createElement('div');
+            triWrap.className = 'point-triangle';
 
-            // SVG container
+            const isDark = i % 2 === 0;
+            const fillColor = isDark ? 'var(--tri-dark)' : 'var(--tri-light)';
+            const strokeColor = isDark ? 'var(--tri-dark-shadow)' : 'var(--tri-light-shadow)';
+            // Use CSS variables in inline SVG via currentColor workaround
+            const darkFill = isDark ? '#8B1A1A' : '#F5F0E1';
+            const darkStroke = isDark ? '#6b1010' : '#d5ccb5';
+
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('viewBox', '0 0 100 240');
+            svg.setAttribute('viewBox', '0 0 100 200');
             svg.setAttribute('preserveAspectRatio', 'none');
-            svg.setAttribute('class', 'triangle-svg');
 
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const gradId = `tg-${i}`;
+            const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+            grad.setAttribute('id', gradId);
+            grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+            grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
 
-            const uid = 'u' + i;
-            const patternId = 'pattern-' + uid;
-            const noiseId = 'noise-' + uid;
-            const innerId = 'inner-' + uid;
-            const clipId = 'clip-' + uid;
+            const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            s1.setAttribute('offset', '0%');
+            s1.setAttribute('stop-color', darkFill);
+            const s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            s2.setAttribute('offset', '100%');
+            s2.setAttribute('stop-color', shadeColor(darkFill, -12));
 
-            // Thin stripe pattern
-            const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-            pattern.setAttribute('id', patternId);
-            pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-            pattern.setAttribute('width', '4');
-            pattern.setAttribute('height', '4');
+            if (!isTopHalf) { // Bottom triangles: light at tip (bottom), darker at base (top)
+                s1.setAttribute('stop-color', shadeColor(darkFill, -12));
+                s2.setAttribute('stop-color', darkFill);
+            }
 
-            // base stripe and narrow dark streak
-            const pRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            pRect.setAttribute('x', '0');
-            pRect.setAttribute('y', '0');
-            pRect.setAttribute('width', '4');
-            pRect.setAttribute('height', '4');
-            pRect.setAttribute('fill', base);
-            pattern.appendChild(pRect);
-
-            const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            stripe.setAttribute('x', '1.6');
-            stripe.setAttribute('y', '0');
-            stripe.setAttribute('width', '0.8');
-            stripe.setAttribute('height', '4');
-            stripe.setAttribute('fill', shadeColor(base, -18));
-            stripe.setAttribute('opacity', '0.25');
-            pattern.appendChild(stripe);
-
-            defs.appendChild(pattern);
-
-            // turbulence noise for subtle grain overlay
-            const filterNoise = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-            filterNoise.setAttribute('id', noiseId);
-            const turb = document.createElementNS('http://www.w3.org/2000/svg', 'feTurbulence');
-            turb.setAttribute('type', 'fractalNoise');
-            turb.setAttribute('baseFrequency', '0.8');
-            turb.setAttribute('numOctaves', '2');
-            turb.setAttribute('result', 'turb');
-            filterNoise.appendChild(turb);
-            const col = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
-            col.setAttribute('in', 'turb');
-            col.setAttribute('type', 'saturate');
-            col.setAttribute('values', '0');
-            col.setAttribute('result', 'mono');
-            filterNoise.appendChild(col);
-            defs.appendChild(filterNoise);
-
-            // inner shadow filter
-            const filterInner = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-            filterInner.setAttribute('id', innerId);
-            filterInner.setAttribute('x', '-20%');
-            filterInner.setAttribute('y', '-20%');
-            filterInner.setAttribute('width', '140%');
-            filterInner.setAttribute('height', '140%');
-            const feOffset = document.createElementNS('http://www.w3.org/2000/svg', 'feOffset');
-            feOffset.setAttribute('dx', '0');
-            feOffset.setAttribute('dy', '2');
-            feOffset.setAttribute('result', 'off');
-            const feGauss = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
-            feGauss.setAttribute('in', 'off');
-            feGauss.setAttribute('stdDeviation', '3');
-            feGauss.setAttribute('result', 'blur');
-            const feComp = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
-            feComp.setAttribute('in', 'blur');
-            feComp.setAttribute('in2', 'SourceAlpha');
-            feComp.setAttribute('operator', 'arithmetic');
-            feComp.setAttribute('k1', '0');
-            feComp.setAttribute('k2', '1');
-            feComp.setAttribute('k3', '-1');
-            feComp.setAttribute('k4', '0');
-            feComp.setAttribute('result', 'inner');
-            const feColor = document.createElementNS('http://www.w3.org/2000/svg', 'feFlood');
-            feColor.setAttribute('flood-color', 'rgba(0,0,0,0.28)');
-            feColor.setAttribute('result', 'flood');
-            const feComp2 = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
-            feComp2.setAttribute('in', 'flood');
-            feComp2.setAttribute('in2', 'inner');
-            feComp2.setAttribute('operator', 'in');
-            feComp2.setAttribute('result', 'innerColor');
-            const feBlend = document.createElementNS('http://www.w3.org/2000/svg', 'feBlend');
-            feBlend.setAttribute('in', 'SourceGraphic');
-            feBlend.setAttribute('in2', 'innerColor');
-            feBlend.setAttribute('mode', 'normal');
-            filterInner.appendChild(feOffset);
-            filterInner.appendChild(feGauss);
-            filterInner.appendChild(feComp);
-            filterInner.appendChild(feColor);
-            filterInner.appendChild(feComp2);
-            filterInner.appendChild(feBlend);
-            defs.appendChild(filterInner);
-
-            // clip path triangle for crisp pattern edges
-            const clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
-            clip.setAttribute('id', clipId);
-            const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) clipPath.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            else clipPath.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            clip.appendChild(clipPath);
-            defs.appendChild(clip);
-
+            grad.appendChild(s1);
+            grad.appendChild(s2);
+            defs.appendChild(grad);
             svg.appendChild(defs);
 
-            // main triangle filled with pattern
-            const main = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) main.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            else main.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            main.setAttribute('fill', 'url(#' + patternId + ')');
-            main.setAttribute('clip-path', 'url(#' + clipId + ')');
-            svg.appendChild(main);
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            if (isTopHalf) {
+                path.setAttribute('d', 'M 5 0 L 95 0 L 50 195 Z');
+            } else {
+                path.setAttribute('d', 'M 5 200 L 95 200 L 50 5 Z');
+            }
+            path.setAttribute('fill', `url(#${gradId})`);
+            path.setAttribute('stroke', darkStroke);
+            path.setAttribute('stroke-width', '1.2');
+            path.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(path);
 
-            // subtle noise overlay
-            const noiseRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            noiseRect.setAttribute('x', '0');
-            noiseRect.setAttribute('y', '0');
-            noiseRect.setAttribute('width', '100');
-            noiseRect.setAttribute('height', '240');
-            noiseRect.setAttribute('filter', 'url(#' + noiseId + ')');
-            noiseRect.setAttribute('opacity', '0.06');
-            noiseRect.setAttribute('clip-path', 'url(#' + clipId + ')');
-            svg.appendChild(noiseRect);
+            triWrap.appendChild(svg);
+            pt.appendChild(triWrap);
 
-            // inner shadow
-            main.setAttribute('filter', 'url(#' + innerId + ')');
-
-            // highlight overlay (bevel)
-            const hv = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-            const hvId = 'hv-' + uid;
-            hv.setAttribute('id', hvId);
-            hv.setAttribute('x1', '0'); hv.setAttribute('y1', '0'); hv.setAttribute('x2', '0'); hv.setAttribute('y2', '1');
-            const hvA = document.createElementNS('http://www.w3.org/2000/svg', 'stop'); hvA.setAttribute('offset','0%'); hvA.setAttribute('stop-color','rgba(255,255,255,0.12)');
-            const hvB = document.createElementNS('http://www.w3.org/2000/svg', 'stop'); hvB.setAttribute('offset','60%'); hvB.setAttribute('stop-color','rgba(255,255,255,0)');
-            hv.appendChild(hvA); hv.appendChild(hvB);
-            defs.appendChild(hv);
-
-            const bevel = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) bevel.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            else bevel.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            bevel.setAttribute('fill', 'url(#' + hvId + ')');
-            bevel.setAttribute('opacity', '0.6');
-            bevel.setAttribute('clip-path', 'url(#' + clipId + ')');
-            svg.appendChild(bevel);
-
-            // thin stroke for definition
-            const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if(isTopHalf) outline.setAttribute('d', 'M 15 0 L 85 0 L 100 240 L 0 240 Z');
-            else outline.setAttribute('d', 'M 0 0 L 100 0 L 85 240 L 15 240 Z');
-            outline.setAttribute('fill', 'none');
-            outline.setAttribute('stroke', 'rgba(0,0,0,0.45)');
-            outline.setAttribute('stroke-width', '0.9');
-            svg.appendChild(outline);
-
-            pt.appendChild(svg);
-
-            // Create checkers container
-            const checkersDiv = document.createElement('div');
-            checkersDiv.className = 'checkers';
-
+            // Checkers
             const val = gameState.board[i];
             const count = Math.abs(val);
             const color = val > 0 ? 'white' : 'black';
 
-            for(let n=0; n<count && n<6; n++) {
-                const checker = document.createElement('div');
-                checker.className = `checker ${color}`;
-                checkersDiv.appendChild(checker);
+            if (count > 0) {
+                const stack = document.createElement('div');
+                stack.className = 'checkers-stack';
+
+                const maxShow = Math.min(count, 5);
+                for (let n = 0; n < maxShow; n++) {
+                    const checker = document.createElement('div');
+                    checker.className = `checker ${color}-checker`;
+
+                    // Show count on top checker if more than 5
+                    if (count > 5 && n === maxShow - 1) {
+                        const badge = document.createElement('span');
+                        badge.className = 'checker-count';
+                        badge.textContent = count;
+                        checker.appendChild(badge);
+                    }
+                    stack.appendChild(checker);
+                }
+                pt.appendChild(stack);
             }
 
-            pt.appendChild(checkersDiv);
-
-            const label = document.createElement('div');
-            label.className = 'point-label';
-            label.textContent = i+1;
-            pt.appendChild(label);
+            // Point number
+            const num = document.createElement('div');
+            num.className = 'point-num';
+            num.textContent = i + 1;
+            pt.appendChild(num);
 
             pt.onclick = () => handlePointClick(i);
             return pt;
         }
 
-        // Utility: shade a hex color by percent (-100..100)
         function shadeColor(hex, percent) {
-            const h = hex.replace('#','');
-            const r = parseInt(h.substring(0,2),16);
-            const g = parseInt(h.substring(2,4),16);
-            const b = parseInt(h.substring(4,6),16);
+            const h = hex.replace('#', '');
+            const r = parseInt(h.substring(0, 2), 16);
+            const g = parseInt(h.substring(2, 4), 16);
+            const b = parseInt(h.substring(4, 6), 16);
             const t = percent < 0 ? 0 : 255;
             const p = Math.abs(percent) / 100;
             const R = Math.round((t - r) * p) + r;
@@ -622,37 +958,51 @@
             const B = Math.round((t - b) * p) + b;
             return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
         }
-        
+
+        function updateHUD() {
+            const isMyTurn = gameState.turn === myRole;
+            const turnLabel = document.getElementById('turn-label');
+            turnLabel.textContent = isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN';
+            turnLabel.style.color = isMyTurn ? 'var(--gold-light)' : '#6a6050';
+            document.getElementById('roll-btn').disabled = !isMyTurn;
+
+            // Render dice if they exist
+            if (gameState.dice[0] > 0) renderDie('die1', gameState.dice[0]);
+            if (gameState.dice[1] > 0) renderDie('die2', gameState.dice[1]);
+        }
+
+        /* ── Game Logic ── */
         let selectedPoint = null;
+
         function handlePointClick(i) {
-            if(gameState.turn !== myRole) return;
-            
-            if(selectedPoint === null) {
-                if(gameState.board[i] === 0) return;
+            if (gameState.turn !== myRole) return;
+
+            if (selectedPoint === null) {
+                const val = gameState.board[i];
+                if (val === 0) return;
+                // Host plays white (positive), guest plays black (negative)
+                if (myRole === 'host' && val < 0) return;
+                if (myRole === 'guest' && val > 0) return;
+
                 selectedPoint = i;
-                document.querySelector(`.point[data-index="${i}"]`).classList.add('selected');
+                const ptEl = document.querySelector(`.point[data-index="${i}"]`);
+                if (ptEl) ptEl.classList.add('selected');
             } else {
                 const piece = gameState.board[selectedPoint] > 0 ? 1 : -1;
                 gameState.board[selectedPoint] -= piece;
                 gameState.board[i] += piece;
-                
+
                 gameState.turn = myRole === 'host' ? 'guest' : 'host';
-                document.querySelector(`.point[data-index="${selectedPoint}"]`).classList.remove('selected');
+                const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
+                if (selEl) selEl.classList.remove('selected');
                 selectedPoint = null;
                 sync();
             }
         }
-        
-        function rollDice() {
-            if(gameState.turn !== myRole) return;
-            const d1 = Math.floor(Math.random() * 6) + 1;
-            const d2 = Math.floor(Math.random() * 6) + 1;
-            document.getElementById('dice-val').innerText = `${d1} • ${d2}`;
-        }
-        
+
         function sync() {
             renderBoard();
-            if(conn) conn.send(gameState);
+            if (conn && conn.open) conn.send(gameState);
         }
     </script>
 </body>
