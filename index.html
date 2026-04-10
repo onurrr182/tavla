@@ -743,7 +743,11 @@
             conn.on('open', () => {
                 document.getElementById('conn-dot').classList.add('connected');
                 document.getElementById('conn-label').innerText = 'Connected';
-                renderBoard();
+                if (myRole === 'host') {
+                    sync();
+                } else {
+                    renderBoard();
+                }
             });
             conn.on('data', (data) => {
                 gameState = data;
