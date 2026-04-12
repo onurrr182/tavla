@@ -696,7 +696,8 @@
             turn: 'host',
             bar: { white: 0, black: 0 },
             dice: [0, 0],
-            borne: { white: 0, black: 0 }
+            borne: { white: 0, black: 0 },
+            hasRolled: false
         };
 
         function createGame() {
@@ -755,14 +756,23 @@
             });
         }
 
-        /* ── Dice ── */
+        /* ── Dice & Turns ── */
         function rollDice() {
-            if (gameState.turn !== myRole) return;
+            if (gameState.turn !== myRole || gameState.hasRolled) return;
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
             gameState.dice = [d1, d2];
+            gameState.hasRolled = true;
             renderDie('die1', d1);
             renderDie('die2', d2);
+            sync();
+        }
+
+        function endTurn() {
+            if (gameState.turn !== myRole) return;
+            gameState.turn = myRole === 'host' ? 'guest' : 'host';
+            gameState.hasRolled = false;
+            gameState.dice = [0, 0];
             sync();
         }
 
@@ -968,11 +978,23 @@
             const turnLabel = document.getElementById('turn-label');
             turnLabel.textContent = isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN';
             turnLabel.style.color = isMyTurn ? 'var(--gold-light)' : '#6a6050';
-            document.getElementById('roll-btn').disabled = !isMyTurn;
+            
+            const rollBtn = document.getElementById('roll-btn');
+            rollBtn.disabled = !isMyTurn;
+            if (isMyTurn && gameState.hasRolled) {
+                rollBtn.textContent = 'End Turn';
+                rollBtn.onclick = endTurn;
+            } else {
+                rollBtn.textContent = 'Roll';
+                rollBtn.onclick = rollDice;
+            }
 
             // Render dice if they exist
             if (gameState.dice[0] > 0) renderDie('die1', gameState.dice[0]);
+            else document.getElementById('die1').innerHTML = '';
+            
             if (gameState.dice[1] > 0) renderDie('die2', gameState.dice[1]);
+            else document.getElementById('die2').innerHTML = '';
         }
 
         /* ── Game Logic ── */
@@ -996,7 +1018,6 @@
                 gameState.board[selectedPoint] -= piece;
                 gameState.board[i] += piece;
 
-                gameState.turn = myRole === 'host' ? 'guest' : 'host';
                 const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
                 if (selEl) selEl.classList.remove('selected');
                 selectedPoint = null;
