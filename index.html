@@ -1062,161 +1062,165 @@
 
         /* ── Game Logic ── */
         let selectedPoint = null;
+        let validTargetsMap = new Map(); // to Index -> { diceUsed: [] }
 
         function handlePointClick(i) {
             if (gameState.turn !== myRole || !gameState.hasRolled) return;
 
-            // If we have pieces on the bar, we MUST move them first
             const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
             
             if (selectedPoint === null) {
-                // If on bar, user must click the bar or we auto-select? 
-                // Let's allow clicking any point to "deselect" or select.
-                // But if pieces are on bar, selectedPoint must logically be 'bar'.
-                
+                // If pieces are on bar, MUST click bar first
                 if (piecesOnBar > 0) {
-                    selectedPoint = 'bar';
-                    highlightValidMoves(-1); // Special index for bar
-                    renderBoard();
+                    triggerShake('conn-dot'); // Visual hint it's not point click time
                     return;
                 }
 
                 const val = gameState.board[i];
-                if (val === 0) return;
-                if (myRole === 'host' && val < 0) return;
-                if (myRole === 'guest' && val > 0) return;
+                if (val === 0 || (myRole === 'host' && val < 0) || (myRole === 'guest' && val > 0)) return;
 
                 selectedPoint = i;
                 highlightValidMoves(i);
                 renderBoard();
             } else {
-                // Move logic
-                const validMoves = getValidMoves(selectedPoint);
-                const moveObj = validMoves.find(m => m.to === i);
-
-                if (moveObj) {
-                    executeMove(selectedPoint, i, moveObj.diceUsed);
-                } else {
-                    // Deselect or select new
+                // If i is already selected, deselect
+                if (selectedPoint === i) {
                     selectedPoint = null;
-                    handlePointClick(i); // Try selecting the new point
+                    validTargetsMap.clear();
+                    renderBoard();
+                    return;
+                }
+
+                const moveInfo = validTargetsMap.get(typeof i === 'number' ? i : 'off');
+                if (moveInfo) {
+                    executeMove(selectedPoint, i, moveInfo.diceUsed);
+                } else {
+                    // Selection handling
+                    const val = gameState.board[i];
+                    if (val !== 0 && ((myRole === 'host' && val > 0) || (myRole === 'guest' && val < 0))) {
+                        selectedPoint = i;
+                        highlightValidMoves(i);
+                        renderBoard();
+                    } else {
+                        // Attempted illegal move
+                        triggerShake('board');
+                        selectedPoint = null;
+                        validTargetsMap.clear();
+                        renderBoard();
+                    }
                 }
             }
         }
 
         function getValidMoves(from) {
-            const moves = [];
-            if (gameState.movesLeft.length === 0) return moves;
+            const results = new Map();
+            if (gameState.movesLeft.length === 0) return results;
 
             const player = myRole;
-            const dice = [...new Set(gameState.movesLeft)]; // Unique dice values available
+            const dice = [...gameState.movesLeft];
 
-            dice.forEach(d => {
-                let to;
-                if (from === 'bar') {
-                    to = player === 'host' ? d - 1 : 24 - d;
-                } else {
-                    to = player === 'host' ? from + d : from - d;
-                }
+            function findReachable(currentPos, remainingDice, usedDice) {
+                if (remainingDice.length === 0) return;
 
-                if (isValidTarget(to, player)) {
-                    moves.push({ to, diceUsed: d });
-                }
-                
-                // Handling bearing off
-                if (canBearOff(player)) {
-                    if (from !== 'bar') {
-                        let isOff = false;
-                        if (player === 'host' && from + d >= 24) isOff = true;
-                        if (player === 'guest' && from - d < 0) isOff = true;
+                // Try each unique available die
+                const uniqueDice = [...new Set(remainingDice)];
+                uniqueDice.forEach(d => {
+                    let to;
+                    if (currentPos === 'bar') {
+                        to = player === 'host' ? d - 1 : 24 - d;
+                    } else {
+                        to = player === 'host' ? currentPos + d : currentPos - d;
+                    }
+
+                    // Check if this step is valid
+                    if (isValidTarget(to, player)) {
+                        const newUsed = [...usedDice, d];
+                        results.set(to, { diceUsed: newUsed });
                         
+                        // Recursive for combined moves
+                        const nextDice = [...remainingDice];
+                        nextDice.splice(nextDice.indexOf(d), 1);
+                        findReachable(to, nextDice, newUsed);
+                    } else if (canBearOff(player) && currentPos !== 'bar') {
+                        // Bearing off check
+                        const isOff = (player === 'host' && (currentPos + d >= 24)) || 
+                                      (player === 'guest' && (currentPos - d < 0));
                         if (isOff) {
-                            moves.push({ to: 'off', diceUsed: d });
+                            const newUsed = [...usedDice, d];
+                            results.set('off', { diceUsed: newUsed });
                         }
                     }
-                }
-            });
+                });
+            }
 
-            return moves;
+            findReachable(from, dice, []);
+            return results;
         }
 
         function isValidTarget(to, player) {
             if (to < 0 || to > 23) return false;
             const val = gameState.board[to];
             if (val === 0) return true;
-            if (player === 'host') return val >= -1; // Can land if 0 or -1 (hit) or > 0
-            if (player === 'guest') return val <= 1;  // Can land if 0 or 1 (hit) or < 0
+            if (player === 'host') return val >= -1;
+            if (player === 'guest') return val <= 1;
             return false;
         }
 
         function canBearOff(player) {
-            const barCount = player === 'host' ? gameState.bar.white : gameState.bar.black;
-            if (barCount > 0) return false;
-
+            if ((player === 'host' ? gameState.bar.white : gameState.bar.black) > 0) return false;
             for (let i = 0; i < 24; i++) {
                 const val = gameState.board[i];
-                if (player === 'host') {
-                    if (val > 0 && i < 18) return false;
-                } else {
-                    if (val < 0 && i > 5) return false;
-                }
+                if ((player === 'host' && val > 0 && i < 18) || (player === 'guest' && val < 0 && i > 5)) return false;
             }
             return true;
         }
 
-        function executeMove(from, to, diceVal) {
+        function executeMove(from, to, diceUsed) {
             const player = myRole;
             const piece = player === 'host' ? 1 : -1;
 
-            // 1. Remove piece
             if (from === 'bar') {
-                if (player === 'host') gameState.bar.white--;
-                else gameState.bar.black--;
+                if (player === 'host') gameState.bar.white--; else gameState.bar.black--;
             } else {
                 gameState.board[from] -= piece;
             }
 
-            // 2. Add to target or bear off
             if (to === 'off') {
-                if (player === 'host') gameState.borne.white++;
-                else gameState.borne.black++;
+                if (player === 'host') gameState.borne.white++; else gameState.borne.black++;
             } else {
-                // Check for hit
                 const targetVal = gameState.board[to];
                 if ((player === 'host' && targetVal === -1) || (player === 'guest' && targetVal === 1)) {
-                    // Hit!
-                    if (player === 'host') {
-                        gameState.board[to] = 1;
-                        gameState.bar.black++;
-                    } else {
-                        gameState.board[to] = -1;
-                        gameState.bar.white++;
-                    }
+                    if (player === 'host') { gameState.board[to] = 1; gameState.bar.black++; }
+                    else { gameState.board[to] = -1; gameState.bar.white++; }
                 } else {
                     gameState.board[to] += piece;
                 }
             }
 
-            // 3. Consume dice
-            const dIdx = gameState.movesLeft.indexOf(diceVal);
-            if (dIdx > -1) gameState.movesLeft.splice(dIdx, 1);
+            diceUsed.forEach(d => {
+                const idx = gameState.movesLeft.indexOf(d);
+                if (idx > -1) gameState.movesLeft.splice(idx, 1);
+            });
 
             selectedPoint = null;
-            
-            // Check if game over
-            if (gameState.borne.white === 15) {
-                alert("WHITE WINS!");
-            } else if (gameState.borne.black === 15) {
-                alert("BLACK WINS!");
-            }
-
+            validTargetsMap.clear();
+            if (gameState.borne.white === 15) alert("WHITE WINS!");
+            else if (gameState.borne.black === 15) alert("BLACK WINS!");
             sync();
         }
 
-        let validTargets = [];
         function highlightValidMoves(from) {
-            const moves = getValidMoves(from);
-            validTargets = moves.map(m => m.to);
+            validTargetsMap = getValidMoves(from);
+        }
+
+        function triggerShake(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.transition = 'none';
+            el.style.transform = 'translateX(5px)';
+            setTimeout(() => el.style.transform = 'translateX(-5px)', 50);
+            setTimeout(() => el.style.transform = 'translateX(5px)', 100);
+            setTimeout(() => el.style.transform = 'translateX(0)', 150);
         }
 
         function sync() {
@@ -1224,14 +1228,15 @@
             if (conn && conn.open) conn.send(gameState);
         }
 
-        // Add Bar Click capability
         function handleBarClick() {
-            if (gameState.turn !== myRole) return;
+            if (gameState.turn !== myRole || !gameState.hasRolled) return;
             const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
             if (piecesOnBar > 0) {
                 selectedPoint = 'bar';
                 highlightValidMoves('bar');
                 renderBoard();
+            } else {
+                triggerShake('conn-dot');
             }
         }
 
@@ -1247,7 +1252,7 @@
             }
             
             // Highlight targets
-            validTargets.forEach(to => {
+            for (let to of validTargetsMap.keys()) {
                 if (to === 'off') {
                     const trayId = myRole === 'host' ? 'tray-host' : 'tray-guest';
                     const trayEl = document.getElementById(trayId);
@@ -1259,8 +1264,17 @@
                     const targetEl = document.querySelector(`.point[data-index="${to}"]`);
                     if (targetEl) targetEl.classList.add('valid-target');
                 }
-            });
-            validTargets = []; // Reset after render
+            }
+            
+            // Reset box shadow on trays if they are no longer targets? 
+            // Actually renderBoard clears the board so we should be fine, but trays are NOT cleared.
+            // Let's reset trays explicitly or in originalRenderBoard.
+            if (!validTargetsMap.has('off')) {
+                const hTray = document.getElementById('tray-host');
+                const gTray = document.getElementById('tray-guest');
+                if (hTray) { hTray.style.boxShadow = ''; hTray.style.borderColor = ''; }
+                if (gTray) { gTray.style.boxShadow = ''; gTray.style.borderColor = ''; }
+            }
 
             // Update dice display with remaining moves
             const diceArea = document.querySelector('.dice-area');
