@@ -695,12 +695,14 @@
             board: [2,0,0,0,0,-5, 0,-3,0,0,0,5, -5,0,0,0,3,0, 5,0,0,0,0,-2],
             turn: 'host',
             bar: { white: 0, black: 0 },
-            dice: [0, 0],
+            dice: [],
+            movesLeft: [],
             borne: { white: 0, black: 0 },
             hasRolled: false
         };
 
         function createGame() {
+            console.log("Creating game...");
             const id = generateId();
             initPeer(id);
             myRole = 'host';
@@ -710,12 +712,18 @@
         function joinGame() {
             const id = document.getElementById('joinId').value.toUpperCase().trim();
             if (id.length < 2) return;
+            console.log("Joining game:", id);
             initPeer();
             myRole = 'guest';
-            setTimeout(() => {
-                conn = peer.connect(id);
-                setupConn();
-            }, 1000);
+            
+            // Wait for peer to be open before connecting
+            const checkPeer = setInterval(() => {
+                if (peer && peer.open) {
+                    clearInterval(checkPeer);
+                    conn = peer.connect(id);
+                    setupConn();
+                }
+            }, 500);
         }
 
         function generateId() {
@@ -726,22 +734,37 @@
         }
 
         function initPeer(id = null) {
-            peer = id ? new Peer(id) : new Peer();
-            peer.on('open', () => {
-                document.getElementById('setup').classList.add('hidden');
-                document.getElementById('game-container').classList.remove('hidden');
-                document.getElementById('game-container').classList.add('fade-in');
-                renderBoard();
-                if (!id) document.getElementById('display-id').innerText = '…';
-            });
-            peer.on('connection', (c) => {
-                conn = c;
-                setupConn();
-            });
+            try {
+                peer = id ? new Peer(id) : new Peer();
+                
+                peer.on('open', () => {
+                    console.log("Peer opened with ID:", peer.id);
+                    document.getElementById('setup').classList.add('hidden');
+                    document.getElementById('game-container').classList.remove('hidden');
+                    document.getElementById('game-container').classList.add('fade-in');
+                    renderBoard();
+                    if (!id) document.getElementById('display-id').innerText = peer.id.substring(0, 4);
+                });
+
+                peer.on('connection', (c) => {
+                    console.log("Incoming connection from:", c.peer);
+                    conn = c;
+                    setupConn();
+                });
+
+                peer.on('error', (err) => {
+                    console.error("PeerJS Error:", err);
+                    alert("Connection error: " + err.type);
+                });
+            } catch (e) {
+                console.error("Failed to initialize Peer:", e);
+                alert("Failed to initialize peer connection. Check internet or browser compatibility.");
+            }
         }
 
         function setupConn() {
             conn.on('open', () => {
+                console.log("Connection established with peer");
                 document.getElementById('conn-dot').classList.add('connected');
                 document.getElementById('conn-label').innerText = 'Connected';
                 if (myRole === 'host') {
@@ -750,9 +773,17 @@
                     renderBoard();
                 }
             });
+
             conn.on('data', (data) => {
+                console.log("Data received:", data);
                 gameState = data;
                 renderBoard();
+            });
+
+            conn.on('close', () => {
+                console.log("Peer connection closed");
+                document.getElementById('conn-dot').classList.remove('connected');
+                document.getElementById('conn-label').innerText = 'Disconnected';
             });
         }
 
@@ -761,7 +792,14 @@
             if (gameState.turn !== myRole || gameState.hasRolled) return;
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
+            
             gameState.dice = [d1, d2];
+            if (d1 === d2) {
+                gameState.movesLeft = [d1, d1, d1, d1];
+            } else {
+                gameState.movesLeft = [d1, d2];
+            }
+            
             gameState.hasRolled = true;
             renderDie('die1', d1);
             renderDie('die2', d2);
@@ -772,7 +810,8 @@
             if (gameState.turn !== myRole) return;
             gameState.turn = myRole === 'host' ? 'guest' : 'host';
             gameState.hasRolled = false;
-            gameState.dice = [0, 0];
+            gameState.dice = [];
+            gameState.movesLeft = [];
             sync();
         }
 
@@ -805,7 +844,18 @@
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
 
-            // Left half (points 13-18 top, 7-12 bottom from host perspective)
+            // 1. Left bearing tray (for Guest/Black)
+            const guestTray = document.createElement('div');
+            guestTray.className = 'bearing-tray';
+            guestTray.id = 'tray-guest';
+            for (let n = 0; n < gameState.borne.black; n++) {
+                const chip = document.createElement('div');
+                chip.className = 'bearing-chip black-chip';
+                guestTray.appendChild(chip);
+            }
+            guestTray.onclick = () => { if(myRole === 'guest') handlePointClick('off'); };
+
+            // 2. Left half (points 13-18 top, 7-12 bottom)
             const leftHalf = document.createElement('div');
             leftHalf.className = 'board-half';
 
@@ -820,11 +870,10 @@
             leftHalf.appendChild(topLeft);
             leftHalf.appendChild(bottomLeft);
 
-            // Center bar
+            // 3. Center bar
             const bar = document.createElement('div');
             bar.className = 'board-bar';
 
-            // Bar checkers
             const barWhite = document.createElement('div');
             barWhite.className = 'bar-checkers';
             for (let n = 0; n < gameState.bar.white; n++) {
@@ -842,7 +891,7 @@
             bar.appendChild(barWhite);
             bar.appendChild(barBlack);
 
-            // Right half (points 19-24 top, 1-6 bottom)
+            // 4. Right half (points 19-24 top, 1-6 bottom)
             const rightHalf = document.createElement('div');
             rightHalf.className = 'board-half';
 
@@ -857,9 +906,23 @@
             rightHalf.appendChild(topRight);
             rightHalf.appendChild(bottomRight);
 
+            // 5. Right bearing tray (for Host/White)
+            const hostTray = document.createElement('div');
+            hostTray.className = 'bearing-tray';
+            hostTray.id = 'tray-host';
+            for (let n = 0; n < gameState.borne.white; n++) {
+                const chip = document.createElement('div');
+                chip.className = 'bearing-chip white-chip';
+                hostTray.appendChild(chip);
+            }
+            hostTray.onclick = () => { if(myRole === 'host') handlePointClick('off'); };
+
+            // Assemble
+            boardDiv.appendChild(guestTray);
             boardDiv.appendChild(leftHalf);
             boardDiv.appendChild(bar);
             boardDiv.appendChild(rightHalf);
+            boardDiv.appendChild(hostTray);
 
             // Update HUD
             updateHUD();
@@ -1001,34 +1064,223 @@
         let selectedPoint = null;
 
         function handlePointClick(i) {
-            if (gameState.turn !== myRole) return;
+            if (gameState.turn !== myRole || !gameState.hasRolled) return;
 
+            // If we have pieces on the bar, we MUST move them first
+            const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
+            
             if (selectedPoint === null) {
+                // If on bar, user must click the bar or we auto-select? 
+                // Let's allow clicking any point to "deselect" or select.
+                // But if pieces are on bar, selectedPoint must logically be 'bar'.
+                
+                if (piecesOnBar > 0) {
+                    selectedPoint = 'bar';
+                    highlightValidMoves(-1); // Special index for bar
+                    renderBoard();
+                    return;
+                }
+
                 const val = gameState.board[i];
                 if (val === 0) return;
-                // Host plays white (positive), guest plays black (negative)
                 if (myRole === 'host' && val < 0) return;
                 if (myRole === 'guest' && val > 0) return;
 
                 selectedPoint = i;
-                const ptEl = document.querySelector(`.point[data-index="${i}"]`);
-                if (ptEl) ptEl.classList.add('selected');
+                highlightValidMoves(i);
+                renderBoard();
             } else {
-                const piece = gameState.board[selectedPoint] > 0 ? 1 : -1;
-                gameState.board[selectedPoint] -= piece;
-                gameState.board[i] += piece;
+                // Move logic
+                const validMoves = getValidMoves(selectedPoint);
+                const moveObj = validMoves.find(m => m.to === i);
 
-                const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
-                if (selEl) selEl.classList.remove('selected');
-                selectedPoint = null;
-                sync();
+                if (moveObj) {
+                    executeMove(selectedPoint, i, moveObj.diceUsed);
+                } else {
+                    // Deselect or select new
+                    selectedPoint = null;
+                    handlePointClick(i); // Try selecting the new point
+                }
             }
+        }
+
+        function getValidMoves(from) {
+            const moves = [];
+            if (gameState.movesLeft.length === 0) return moves;
+
+            const player = myRole;
+            const dice = [...new Set(gameState.movesLeft)]; // Unique dice values available
+
+            dice.forEach(d => {
+                let to;
+                if (from === 'bar') {
+                    to = player === 'host' ? d - 1 : 24 - d;
+                } else {
+                    to = player === 'host' ? from + d : from - d;
+                }
+
+                if (isValidTarget(to, player)) {
+                    moves.push({ to, diceUsed: d });
+                }
+                
+                // Handling bearing off
+                if (canBearOff(player)) {
+                    if (from !== 'bar') {
+                        let isOff = false;
+                        if (player === 'host' && from + d >= 24) isOff = true;
+                        if (player === 'guest' && from - d < 0) isOff = true;
+                        
+                        if (isOff) {
+                            moves.push({ to: 'off', diceUsed: d });
+                        }
+                    }
+                }
+            });
+
+            return moves;
+        }
+
+        function isValidTarget(to, player) {
+            if (to < 0 || to > 23) return false;
+            const val = gameState.board[to];
+            if (val === 0) return true;
+            if (player === 'host') return val >= -1; // Can land if 0 or -1 (hit) or > 0
+            if (player === 'guest') return val <= 1;  // Can land if 0 or 1 (hit) or < 0
+            return false;
+        }
+
+        function canBearOff(player) {
+            const barCount = player === 'host' ? gameState.bar.white : gameState.bar.black;
+            if (barCount > 0) return false;
+
+            for (let i = 0; i < 24; i++) {
+                const val = gameState.board[i];
+                if (player === 'host') {
+                    if (val > 0 && i < 18) return false;
+                } else {
+                    if (val < 0 && i > 5) return false;
+                }
+            }
+            return true;
+        }
+
+        function executeMove(from, to, diceVal) {
+            const player = myRole;
+            const piece = player === 'host' ? 1 : -1;
+
+            // 1. Remove piece
+            if (from === 'bar') {
+                if (player === 'host') gameState.bar.white--;
+                else gameState.bar.black--;
+            } else {
+                gameState.board[from] -= piece;
+            }
+
+            // 2. Add to target or bear off
+            if (to === 'off') {
+                if (player === 'host') gameState.borne.white++;
+                else gameState.borne.black++;
+            } else {
+                // Check for hit
+                const targetVal = gameState.board[to];
+                if ((player === 'host' && targetVal === -1) || (player === 'guest' && targetVal === 1)) {
+                    // Hit!
+                    if (player === 'host') {
+                        gameState.board[to] = 1;
+                        gameState.bar.black++;
+                    } else {
+                        gameState.board[to] = -1;
+                        gameState.bar.white++;
+                    }
+                } else {
+                    gameState.board[to] += piece;
+                }
+            }
+
+            // 3. Consume dice
+            const dIdx = gameState.movesLeft.indexOf(diceVal);
+            if (dIdx > -1) gameState.movesLeft.splice(dIdx, 1);
+
+            selectedPoint = null;
+            
+            // Check if game over
+            if (gameState.borne.white === 15) {
+                alert("WHITE WINS!");
+            } else if (gameState.borne.black === 15) {
+                alert("BLACK WINS!");
+            }
+
+            sync();
+        }
+
+        let validTargets = [];
+        function highlightValidMoves(from) {
+            const moves = getValidMoves(from);
+            validTargets = moves.map(m => m.to);
         }
 
         function sync() {
             renderBoard();
             if (conn && conn.open) conn.send(gameState);
         }
+
+        // Add Bar Click capability
+        function handleBarClick() {
+            if (gameState.turn !== myRole) return;
+            const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
+            if (piecesOnBar > 0) {
+                selectedPoint = 'bar';
+                highlightValidMoves('bar');
+                renderBoard();
+            }
+        }
+
+        // Update renderBoard to include valid move highlights and bar clicks
+        const originalRenderBoard = renderBoard;
+        renderBoard = function() {
+            originalRenderBoard();
+            
+            // Highlight selected
+            if (selectedPoint !== null && selectedPoint !== 'bar') {
+                const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
+                if (selEl) selEl.classList.add('selected');
+            }
+            
+            // Highlight targets
+            validTargets.forEach(to => {
+                if (to === 'off') {
+                    const trayId = myRole === 'host' ? 'tray-host' : 'tray-guest';
+                    const trayEl = document.getElementById(trayId);
+                    if (trayEl) {
+                        trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,200,100,0.6), 0 0 10px rgba(100,200,100,0.4)';
+                        trayEl.style.borderColor = 'rgba(100,200,100,0.5)';
+                    }
+                } else {
+                    const targetEl = document.querySelector(`.point[data-index="${to}"]`);
+                    if (targetEl) targetEl.classList.add('valid-target');
+                }
+            });
+            validTargets = []; // Reset after render
+
+            // Update dice display with remaining moves
+            const diceArea = document.querySelector('.dice-area');
+            const movesLabel = document.createElement('div');
+            movesLabel.style.fontSize = '0.7rem';
+            movesLabel.style.color = 'var(--gold)';
+            movesLabel.style.marginTop = '4px';
+            movesLabel.textContent = gameState.movesLeft.length > 0 ? `MOVES: ${gameState.movesLeft.join(', ')}` : '';
+            
+            // Clear old label
+            const oldLabel = document.getElementById('moves-left-label');
+            if (oldLabel) oldLabel.remove();
+            movesLabel.id = 'moves-left-label';
+            diceArea.appendChild(movesLabel);
+
+            // Make bar clickable
+            const bar = document.querySelector('.board-bar');
+            bar.style.cursor = 'pointer';
+            bar.onclick = handleBarClick;
+        };
     </script>
 </body>
 </html>
