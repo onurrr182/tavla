@@ -400,6 +400,19 @@
             height: 32px;
             border-radius: 50%;
             position: relative; /* important for ::after absolute positioning */
+            z-index: 25; /* make sure they are above the bar background */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+        }
+
+        .die.used {
+            opacity: 0.3;
+            filter: grayscale(100%);
+            box-shadow: none;
+            border-color: rgba(255,255,255,0.1);
+        }
+        
+        .die.used .die-dot {
+            background: #666;
         }
 
         /* Target Indicator Dot */
@@ -710,6 +723,8 @@
             <div class="dice-area">
                 <div class="die" id="die1" data-value="0"></div>
                 <div class="die" id="die2" data-value="0"></div>
+                <div class="die" id="die3" data-value="0"></div>
+                <div class="die" id="die4" data-value="0"></div>
                 <button class="roll-btn" id="roll-btn" onclick="rollDice()">Roll</button>
             </div>
             <div class="hud-right">
@@ -913,14 +928,14 @@
             barWhite.className = 'bar-checkers';
             for (let n = 0; n < gameState.bar.white; n++) {
                 const c = document.createElement('div');
-                c.className = 'bar-checker white-checker';
+                c.className = 'bar-checker white-checker checker';
                 barWhite.appendChild(c);
             }
             const barBlack = document.createElement('div');
             barBlack.className = 'bar-checkers';
             for (let n = 0; n < gameState.bar.black; n++) {
                 const c = document.createElement('div');
-                c.className = 'bar-checker black-checker';
+                c.className = 'bar-checker black-checker checker';
                 barBlack.appendChild(c);
             }
             bar.appendChild(barWhite);
@@ -1076,6 +1091,7 @@
         }
 
         function updateHUD() {
+            if (!gameState) return;
             const isMyTurn = gameState.turn === myRole;
             const turnLabel = document.getElementById('turn-label');
             turnLabel.textContent = isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN';
@@ -1086,17 +1102,61 @@
             if (isMyTurn && gameState.hasRolled) {
                 rollBtn.textContent = 'End Turn';
                 rollBtn.onclick = endTurn;
+                rollBtn.style.opacity = gameState.movesLeft.length === 0 ? '1' : '0.6';
             } else {
                 rollBtn.textContent = 'Roll';
                 rollBtn.onclick = rollDice;
+                rollBtn.style.opacity = '1';
             }
 
-            // Render dice if they exist
-            if (gameState.dice[0] > 0) renderDie('die1', gameState.dice[0]);
-            else document.getElementById('die1').innerHTML = '';
-            
-            if (gameState.dice[1] > 0) renderDie('die2', gameState.dice[1]);
-            else document.getElementById('die2').innerHTML = '';
+            // Sync Dice Display
+            const diceToRender = [...gameState.dice];
+            if (diceToRender.length === 2 && diceToRender[0] === diceToRender[1]) {
+                // If doubles, we have 4 moves
+                diceToRender.push(diceToRender[0], diceToRender[1]);
+            }
+
+            // Determine which are used
+            const currentMoves = [...gameState.movesLeft];
+            for (let i = 1; i <= 4; i++) {
+                const dieEl = document.getElementById(`die${i}`);
+                const val = diceToRender[i-1];
+                if (val > 0) {
+                    dieEl.style.display = 'block';
+                    renderDie(`die${i}`, val);
+                    
+                    // Highlight if used
+                    const mIdx = currentMoves.indexOf(val);
+                    if (mIdx > -1) {
+                        dieEl.classList.remove('used');
+                        currentMoves.splice(mIdx, 1);
+                    } else {
+                        dieEl.classList.add('used');
+                    }
+                } else {
+                    dieEl.style.display = 'none';
+                }
+            }
+
+            // Moves label
+            const diceArea = document.querySelector('.dice-area');
+            let movesLabel = document.getElementById('moves-left-label');
+            if (!movesLabel) {
+                movesLabel = document.createElement('div');
+                movesLabel.id = 'moves-left-label';
+                movesLabel.style.fontSize = '0.7rem';
+                movesLabel.style.color = 'var(--gold)';
+                movesLabel.style.marginTop = '4px';
+                diceArea.appendChild(movesLabel);
+            }
+            if (gameState.hasRolled) {
+                movesLabel.textContent = gameState.movesLeft.length > 0 
+                    ? `MOVES: ${gameState.movesLeft.join(', ')}` 
+                    : 'NO MOVES LEFT';
+                movesLabel.style.color = gameState.movesLeft.length === 0 ? '#888' : 'var(--gold)';
+            } else {
+                movesLabel.textContent = '';
+            }
         }
 
         /* ── Game Logic ── */
