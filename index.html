@@ -399,7 +399,42 @@
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            position: relative; /* important for ::after absolute positioning */
+        }
+
+        /* Target Indicator Dot */
+        .target-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px;
+            height: 14px;
+            background: rgba(100, 255, 100, 0.7);
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(100, 255, 100, 0.8);
+            display: none;
+            z-index: 20;
+            pointer-events: none;
+            animation: pulse-dot 1.5s infinite;
+        }
+        @keyframes pulse-dot {
+            0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
+        }
+
+        .point.valid-target .target-indicator {
+            display: block;
+        }
+
+        .selected {
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+            border-color: var(--gold) !important;
+            transform: scale(1.1) translateY(-5px);
+        }
+        .bottom-half .selected {
+            transform: scale(1.1) translateY(5px);
         }
 
         /* Board rows (top and bottom) */
@@ -520,7 +555,7 @@
             cursor: grabbing;
         }
 
-        .checker.white-checker {
+        .white-checker {
             background: radial-gradient(circle at 38% 32%,
                 #FFFDF8 0%,
                 #F5F0E6 30%,
@@ -533,7 +568,7 @@
                 inset 0 2px 4px rgba(255,255,255,0.5),
                 inset 0 -2px 4px rgba(0,0,0,0.1);
         }
-        .checker.white-checker::after {
+        .white-checker::after {
             content: '';
             position: absolute;
             top: 6px;
@@ -544,7 +579,7 @@
             border-radius: 50%;
         }
 
-        .checker.black-checker {
+        .black-checker {
             background: radial-gradient(circle at 38% 32%,
                 #3a3a35 0%,
                 #252520 30%,
@@ -557,7 +592,7 @@
                 inset 0 2px 4px rgba(255,255,255,0.08),
                 inset 0 -2px 4px rgba(0,0,0,0.3);
         }
-        .checker.black-checker::after {
+        .black-checker::after {
             content: '';
             position: absolute;
             top: 6px;
@@ -1019,6 +1054,10 @@
             num.textContent = i + 1;
             pt.appendChild(num);
 
+            const indicator = document.createElement('div');
+            indicator.className = 'target-indicator';
+            pt.appendChild(indicator);
+
             pt.onclick = () => handlePointClick(i);
             return pt;
         }
@@ -1246,19 +1285,29 @@
             originalRenderBoard();
             
             // Highlight selected
-            if (selectedPoint !== null && selectedPoint !== 'bar') {
-                const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
-                if (selEl) selEl.classList.add('selected');
+            if (selectedPoint !== null) {
+                if (selectedPoint === 'bar') {
+                    const barCheckers = document.querySelectorAll(myRole === 'host' ? '.bar-checkers .white-checker' : '.bar-checkers .black-checker');
+                    barCheckers.forEach(c => c.classList.add('selected'));
+                } else {
+                    const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
+                    if (selEl) {
+                        const checkers = selEl.querySelectorAll('.checker');
+                        if (checkers.length > 0) {
+                            checkers[checkers.length - 1].classList.add('selected');
+                        }
+                    }
+                }
             }
             
-            // Highlight targets
+            // Highlight targets 
             for (let to of validTargetsMap.keys()) {
                 if (to === 'off') {
                     const trayId = myRole === 'host' ? 'tray-host' : 'tray-guest';
                     const trayEl = document.getElementById(trayId);
                     if (trayEl) {
-                        trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,200,100,0.6), 0 0 10px rgba(100,200,100,0.4)';
-                        trayEl.style.borderColor = 'rgba(100,200,100,0.5)';
+                        trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,255,100,0.6), 0 0 10px rgba(100,255,100,0.4)';
+                        trayEl.style.borderColor = 'rgba(100,255,100,0.5)';
                     }
                 } else {
                     const targetEl = document.querySelector(`.point[data-index="${to}"]`);
