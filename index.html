@@ -740,6 +740,7 @@
         /* ── PeerJS & Game State ── */
         let peer, conn;
         let myRole = 'host';
+        let autoSkipTimer = null;
         let gameState = {
             // Positive = white (host), negative = black (guest)
             board: [2,0,0,0,0,-5, 0,-3,0,0,0,5, -5,0,0,0,3,0, 5,0,0,0,0,-2],
@@ -840,6 +841,7 @@
         /* ── Dice & Turns ── */
         function rollDice() {
             if (gameState.turn !== myRole || gameState.hasRolled) return;
+            if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
             
@@ -858,6 +860,7 @@
 
         function endTurn() {
             if (gameState.turn !== myRole) return;
+            if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
             gameState.turn = myRole === 'host' ? 'guest' : 'host';
             gameState.hasRolled = false;
             gameState.dice = [];
@@ -1090,6 +1093,28 @@
             return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
         }
 
+        function isAnyMovePossible(player) {
+            if (gameState.movesLeft.length === 0) return false;
+            
+            // 1. Check bar
+            const barCount = player === 'host' ? gameState.bar.white : gameState.bar.black;
+            if (barCount > 0) {
+                const barMoves = getValidMoves('bar');
+                if (barMoves.size > 0) return true;
+                // If on bar and no moves from bar, no moves possible at all
+                return false; 
+            }
+            
+            // 2. Check board
+            for (let i = 0; i < 24; i++) {
+                const val = gameState.board[i];
+                if ((player === 'host' && val > 0) || (player === 'guest' && val < 0)) {
+                    if (getValidMoves(i).size > 0) return true;
+                }
+            }
+            return false;
+        }
+
         function updateHUD() {
             if (!gameState) return;
             const isMyTurn = gameState.turn === myRole;
@@ -1097,35 +1122,39 @@
             turnLabel.textContent = isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN';
             turnLabel.style.color = isMyTurn ? 'var(--gold-light)' : '#6a6050';
             
+            const anyPossible = isMyTurn && gameState.hasRolled ? isAnyMovePossible(myRole) : false;
+            const canEnd = isMyTurn && gameState.hasRolled && (!anyPossible || gameState.movesLeft.length === 0);
+
             const rollBtn = document.getElementById('roll-btn');
             rollBtn.disabled = !isMyTurn;
             if (isMyTurn && gameState.hasRolled) {
                 rollBtn.textContent = 'End Turn';
                 rollBtn.onclick = endTurn;
-                rollBtn.style.opacity = gameState.movesLeft.length === 0 ? '1' : '0.6';
+                rollBtn.disabled = !canEnd;
+                rollBtn.style.opacity = canEnd ? '1' : '0.5';
+                rollBtn.style.cursor = canEnd ? 'pointer' : 'not-allowed';
             } else {
                 rollBtn.textContent = 'Roll';
                 rollBtn.onclick = rollDice;
-                rollBtn.style.opacity = '1';
+                rollBtn.disabled = !isMyTurn;
+                rollBtn.style.opacity = isMyTurn ? '1' : '0.5';
+                rollBtn.style.cursor = isMyTurn ? 'pointer' : 'not-allowed';
             }
 
             // Sync Dice Display
             const diceToRender = [...gameState.dice];
             if (diceToRender.length === 2 && diceToRender[0] === diceToRender[1]) {
-                // If doubles, we have 4 moves
                 diceToRender.push(diceToRender[0], diceToRender[1]);
             }
 
-            // Determine which are used
             const currentMoves = [...gameState.movesLeft];
             for (let i = 1; i <= 4; i++) {
                 const dieEl = document.getElementById(`die${i}`);
+                if (!dieEl) continue;
                 const val = diceToRender[i-1];
                 if (val > 0) {
                     dieEl.style.display = 'block';
                     renderDie(`die${i}`, val);
-                    
-                    // Highlight if used
                     const mIdx = currentMoves.indexOf(val);
                     if (mIdx > -1) {
                         dieEl.classList.remove('used');
@@ -1145,17 +1174,34 @@
                 movesLabel = document.createElement('div');
                 movesLabel.id = 'moves-left-label';
                 movesLabel.style.fontSize = '0.7rem';
-                movesLabel.style.color = 'var(--gold)';
                 movesLabel.style.marginTop = '4px';
                 diceArea.appendChild(movesLabel);
             }
             if (gameState.hasRolled) {
-                movesLabel.textContent = gameState.movesLeft.length > 0 
-                    ? `MOVES: ${gameState.movesLeft.join(', ')}` 
-                    : 'NO MOVES LEFT';
-                movesLabel.style.color = gameState.movesLeft.length === 0 ? '#888' : 'var(--gold)';
+                if (gameState.movesLeft.length > 0) {
+                    if (anyPossible) {
+                        movesLabel.textContent = `MOVES: ${gameState.movesLeft.join(', ')}`;
+                        movesLabel.style.color = 'var(--gold)';
+                        if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
+                    } else {
+                        movesLabel.textContent = 'NO LEGAL MOVES - AUTO-SKIPPING...';
+                        movesLabel.style.color = '#ff6b6b'; // Red
+                        triggerShake('roll-btn');
+                        
+                        if (!autoSkipTimer) {
+                            autoSkipTimer = setTimeout(() => {
+                                console.log("Auto-skipping turn...");
+                                endTurn();
+                            }, 2500);
+                        }
+                    }
+                } else {
+                    movesLabel.textContent = 'NO MOVES LEFT';
+                    movesLabel.style.color = '#888';
+                }
             } else {
                 movesLabel.textContent = '';
+                if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
             }
         }
 
