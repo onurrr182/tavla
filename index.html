@@ -34,10 +34,8 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: var(--board-bg);
-            background-image:
-                radial-gradient(ellipse at 50% 30%, rgba(60,45,25,0.6) 0%, transparent 70%),
-                url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            background-color: var(--board-bg);
+            background-image: radial-gradient(ellipse at 50% 30%, rgba(60,45,25,0.6) 0%, transparent 70%);
             color: #e8e0d4;
             display: flex;
             flex-direction: column;
@@ -187,7 +185,6 @@
             background: linear-gradient(135deg, rgba(42,34,26,0.95), rgba(30,24,18,0.95));
             border-radius: 10px;
             border: 1px solid rgba(212,175,55,0.12);
-            backdrop-filter: blur(8px);
         }
 
         .hud-left, .hud-right {
@@ -326,10 +323,8 @@
             width: 100%;
             max-width: 820px;
             aspect-ratio: 1.55 / 1;
-            background: var(--felt-green);
-            background-image:
-                radial-gradient(ellipse at 50% 50%, rgba(30,100,60,0.3) 0%, transparent 70%),
-                url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.06'/%3E%3C/svg%3E");
+            background-color: var(--felt-green);
+            background-image: radial-gradient(ellipse at 50% 50%, rgba(30,100,60,0.3) 0%, transparent 70%);
             border-radius: 6px;
             display: flex;
             position: relative;
@@ -741,8 +736,8 @@
         let peer, conn;
         let myRole = 'host';
         let autoSkipTimer = null;
+        let movesCache = new Map();
         let gameState = {
-            // Positive = white (host), negative = black (guest)
             board: [2,0,0,0,0,-5, 0,-3,0,0,0,5, -5,0,0,0,3,0, 5,0,0,0,0,-2],
             turn: 'host',
             bar: { white: 0, black: 0 },
@@ -752,8 +747,13 @@
             hasRolled: false
         };
 
+        // Cache invalidation helper
+        function invalidateCache() {
+            movesCache.clear();
+        }
+
         function createGame() {
-            console.log("Creating game...");
+            console.log("createGame() called");
             const id = generateId();
             initPeer(id);
             myRole = 'host';
@@ -785,27 +785,41 @@
         }
 
         function initPeer(id = null) {
+            console.log("initPeer called with id:", id);
+            if (peer) {
+                console.warn("Peer already exists, skipping init");
+                return;
+            }
             try {
+                if (typeof Peer === 'undefined') {
+                    throw new Error("PeerJS library not loaded! Check your internet or script tag.");
+                }
                 peer = id ? new Peer(id) : new Peer();
+                console.log("Peer instance created:", peer);
                 
                 peer.on('open', () => {
-                    console.log("Peer opened with ID:", peer.id);
+                    console.log("EVENT: peer.on('open') - ID:", peer.id);
                     document.getElementById('setup').classList.add('hidden');
-                    document.getElementById('game-container').classList.remove('hidden');
-                    document.getElementById('game-container').classList.add('fade-in');
+                    const gameContainer = document.getElementById('game-container');
+                    gameContainer.classList.remove('hidden');
+                    gameContainer.classList.add('fade-in');
                     renderBoard();
                     if (!id) document.getElementById('display-id').innerText = peer.id.substring(0, 4);
                 });
 
                 peer.on('connection', (c) => {
-                    console.log("Incoming connection from:", c.peer);
+                    console.log("EVENT: peer.on('connection') from:", c.peer);
                     conn = c;
                     setupConn();
                 });
 
                 peer.on('error', (err) => {
                     console.error("PeerJS Error:", err);
-                    alert("Connection error: " + err.type);
+                    if (err.type === 'peer-unavailable') {
+                        alert("Peer not found. Check the ID.");
+                    } else {
+                        alert("Connection error: " + err.type);
+                    }
                 });
             } catch (e) {
                 console.error("Failed to initialize Peer:", e);
@@ -828,7 +842,8 @@
             conn.on('data', (data) => {
                 console.log("Data received:", data);
                 gameState = data;
-                renderBoard();
+                invalidateCache();
+                sync();
             });
 
             conn.on('close', () => {
@@ -894,106 +909,20 @@
 
         /* ── Board Rendering ── */
         function renderBoard() {
-            const boardDiv = document.getElementById('board');
-            boardDiv.innerHTML = '';
-
-            // 1. Left bearing tray (for Guest/Black)
-            const guestTray = document.createElement('div');
-            guestTray.className = 'bearing-tray';
-            guestTray.id = 'tray-guest';
-            for (let n = 0; n < gameState.borne.black; n++) {
-                const chip = document.createElement('div');
-                chip.className = 'bearing-chip black-chip';
-                guestTray.appendChild(chip);
-            }
-            guestTray.onclick = () => { if(myRole === 'guest') handlePointClick('off'); };
-
-            // 2. Left half (points 13-18 top, 7-12 bottom)
-            const leftHalf = document.createElement('div');
-            leftHalf.className = 'board-half';
-
-            const topLeft = document.createElement('div');
-            topLeft.className = 'board-row top-half';
-            for (let i = 12; i < 18; i++) topLeft.appendChild(createPoint(i, true));
-
-            const bottomLeft = document.createElement('div');
-            bottomLeft.className = 'board-row bottom-half';
-            for (let i = 11; i >= 6; i--) bottomLeft.appendChild(createPoint(i, false));
-
-            leftHalf.appendChild(topLeft);
-            leftHalf.appendChild(bottomLeft);
-
-            // 3. Center bar
-            const bar = document.createElement('div');
-            bar.className = 'board-bar';
-
-            const barWhite = document.createElement('div');
-            barWhite.className = 'bar-checkers';
-            for (let n = 0; n < gameState.bar.white; n++) {
-                const c = document.createElement('div');
-                c.className = 'bar-checker white-checker checker';
-                barWhite.appendChild(c);
-            }
-            const barBlack = document.createElement('div');
-            barBlack.className = 'bar-checkers';
-            for (let n = 0; n < gameState.bar.black; n++) {
-                const c = document.createElement('div');
-                c.className = 'bar-checker black-checker checker';
-                barBlack.appendChild(c);
-            }
-            bar.appendChild(barWhite);
-            bar.appendChild(barBlack);
-
-            // 4. Right half (points 19-24 top, 1-6 bottom)
-            const rightHalf = document.createElement('div');
-            rightHalf.className = 'board-half';
-
-            const topRight = document.createElement('div');
-            topRight.className = 'board-row top-half';
-            for (let i = 18; i < 24; i++) topRight.appendChild(createPoint(i, true));
-
-            const bottomRight = document.createElement('div');
-            bottomRight.className = 'board-row bottom-half';
-            for (let i = 5; i >= 0; i--) bottomRight.appendChild(createPoint(i, false));
-
-            rightHalf.appendChild(topRight);
-            rightHalf.appendChild(bottomRight);
-
-            // 5. Right bearing tray (for Host/White)
-            const hostTray = document.createElement('div');
-            hostTray.className = 'bearing-tray';
-            hostTray.id = 'tray-host';
-            for (let n = 0; n < gameState.borne.white; n++) {
-                const chip = document.createElement('div');
-                chip.className = 'bearing-chip white-chip';
-                hostTray.appendChild(chip);
-            }
-            hostTray.onclick = () => { if(myRole === 'host') handlePointClick('off'); };
-
-            // Assemble
-            boardDiv.appendChild(guestTray);
-            boardDiv.appendChild(leftHalf);
-            boardDiv.appendChild(bar);
-            boardDiv.appendChild(rightHalf);
-            boardDiv.appendChild(hostTray);
-
-            // Update HUD
-            updateHUD();
+            sync();
         }
 
         function createPoint(i, isTopHalf) {
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
+            if (validTargetsMap.has(i)) pt.classList.add('valid-target');
 
             // Triangle
             const triWrap = document.createElement('div');
             triWrap.className = 'point-triangle';
 
             const isDark = i % 2 === 0;
-            const fillColor = isDark ? 'var(--tri-dark)' : 'var(--tri-light)';
-            const strokeColor = isDark ? 'var(--tri-dark-shadow)' : 'var(--tri-light-shadow)';
-            // Use CSS variables in inline SVG via currentColor workaround
             const darkFill = isDark ? '#8B1A1A' : '#F5F0E1';
             const darkStroke = isDark ? '#6b1010' : '#d5ccb5';
 
@@ -1010,15 +939,10 @@
 
             const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
             s1.setAttribute('offset', '0%');
-            s1.setAttribute('stop-color', darkFill);
+            s1.setAttribute('stop-color', isTopHalf ? darkFill : shadeColor(darkFill, -12));
             const s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
             s2.setAttribute('offset', '100%');
-            s2.setAttribute('stop-color', shadeColor(darkFill, -12));
-
-            if (!isTopHalf) { // Bottom triangles: light at tip (bottom), darker at base (top)
-                s1.setAttribute('stop-color', shadeColor(darkFill, -12));
-                s2.setAttribute('stop-color', darkFill);
-            }
+            s2.setAttribute('stop-color', isTopHalf ? shadeColor(darkFill, -12) : darkFill);
 
             grad.appendChild(s1);
             grad.appendChild(s2);
@@ -1026,15 +950,10 @@
             svg.appendChild(defs);
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            if (isTopHalf) {
-                path.setAttribute('d', 'M 5 0 L 95 0 L 50 195 Z');
-            } else {
-                path.setAttribute('d', 'M 5 200 L 95 200 L 50 5 Z');
-            }
+            path.setAttribute('d', isTopHalf ? 'M 5 0 L 95 0 L 50 195 Z' : 'M 5 200 L 95 200 L 50 5 Z');
             path.setAttribute('fill', `url(#${gradId})`);
             path.setAttribute('stroke', darkStroke);
             path.setAttribute('stroke-width', '1.2');
-            path.setAttribute('stroke-linejoin', 'round');
             svg.appendChild(path);
 
             triWrap.appendChild(svg);
@@ -1053,8 +972,8 @@
                 for (let n = 0; n < maxShow; n++) {
                     const checker = document.createElement('div');
                     checker.className = `checker ${color}-checker`;
+                    if (selectedPoint === i && n === maxShow - 1) checker.classList.add('selected');
 
-                    // Show count on top checker if more than 5
                     if (count > 5 && n === maxShow - 1) {
                         const badge = document.createElement('span');
                         badge.className = 'checker-count';
@@ -1095,17 +1014,8 @@
 
         function isAnyMovePossible(player) {
             if (gameState.movesLeft.length === 0) return false;
-            
-            // 1. Check bar
             const barCount = player === 'host' ? gameState.bar.white : gameState.bar.black;
-            if (barCount > 0) {
-                const barMoves = getValidMoves('bar');
-                if (barMoves.size > 0) return true;
-                // If on bar and no moves from bar, no moves possible at all
-                return false; 
-            }
-            
-            // 2. Check board
+            if (barCount > 0) return getValidMoves('bar').size > 0;
             for (let i = 0; i < 24; i++) {
                 const val = gameState.board[i];
                 if ((player === 'host' && val > 0) || (player === 'guest' && val < 0)) {
@@ -1154,7 +1064,7 @@
                 const val = diceToRender[i-1];
                 if (val > 0) {
                     dieEl.style.display = 'block';
-                    renderDie(`die${i}`, val);
+                    renderDie(dieEl, val, false);
                     const mIdx = currentMoves.indexOf(val);
                     if (mIdx > -1) {
                         dieEl.classList.remove('used');
@@ -1185,9 +1095,8 @@
                         if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
                     } else {
                         movesLabel.textContent = 'NO LEGAL MOVES - AUTO-SKIPPING...';
-                        movesLabel.style.color = '#ff6b6b'; // Red
+                        movesLabel.style.color = '#ff6b6b';
                         triggerShake('roll-btn');
-                        
                         if (!autoSkipTimer) {
                             autoSkipTimer = setTimeout(() => {
                                 console.log("Auto-skipping turn...");
@@ -1203,6 +1112,29 @@
                 movesLabel.textContent = '';
                 if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
             }
+        }
+
+        function renderDie(idOrEl, value, animate = true) {
+            const dieEl = (typeof idOrEl === 'string') ? document.getElementById(idOrEl) : idOrEl;
+            if (!dieEl) return;
+            dieEl.setAttribute('data-value', value);
+            dieEl.innerHTML = '';
+            if (animate) {
+                dieEl.classList.remove('rolling');
+                void dieEl.offsetWidth;
+                dieEl.classList.add('rolling');
+            }
+
+            const dots = {
+                1: ['c'], 2: ['tr', 'bl'], 3: ['tr', 'c', 'bl'],
+                4: ['tl', 'tr', 'bl', 'br'], 5: ['tl', 'tr', 'c', 'bl', 'br'],
+                6: ['tl', 'tr', 'ml', 'mr', 'bl', 'br']
+            };
+            (dots[value] || []).forEach(pos => {
+                const dot = document.createElement('div');
+                dot.className = `die-dot d-${pos}`;
+                dieEl.appendChild(dot);
+            });
         }
 
         /* ── Game Logic ── */
@@ -1258,6 +1190,9 @@
         }
 
         function getValidMoves(from) {
+            const stateKey = `f:${from}_m:${gameState.movesLeft.join(',')}_b:${gameState.board.join(',')}_bar:${gameState.bar.white},${gameState.bar.black}`;
+            if (movesCache.has(stateKey)) return movesCache.get(stateKey);
+
             const results = new Map();
             if (gameState.movesLeft.length === 0) return results;
 
@@ -1299,6 +1234,7 @@
             }
 
             findReachable(from, dice, []);
+            movesCache.set(stateKey, results);
             return results;
         }
 
@@ -1368,9 +1304,117 @@
             setTimeout(() => el.style.transform = 'translateX(0)', 150);
         }
 
+        let syncScheduled = false;
         function sync() {
-            renderBoard();
-            if (conn && conn.open) conn.send(gameState);
+            if (syncScheduled) return;
+            syncScheduled = true;
+            requestAnimationFrame(() => {
+                renderBoardInternal();
+                if (conn && conn.open) conn.send(gameState);
+                syncScheduled = false;
+            });
+        }
+
+        // Rename original renderBoard to renderBoardInternal
+        function renderBoardInternal() {
+            const boardDiv = document.getElementById('board');
+            if (!boardDiv) return;
+            boardDiv.innerHTML = '';
+
+            // 1. Left bearing tray (for Guest/Black)
+            const guestTray = document.createElement('div');
+            guestTray.className = 'bearing-tray';
+            guestTray.id = 'tray-guest';
+            for (let n = 0; n < gameState.borne.black; n++) {
+                const chip = document.createElement('div');
+                chip.className = 'bearing-chip black-chip';
+                guestTray.appendChild(chip);
+            }
+            guestTray.onclick = () => { if(myRole === 'guest') handlePointClick('off'); };
+
+            // 2. Left half (points 13-18 top, 7-12 bottom)
+            const leftHalf = document.createElement('div');
+            leftHalf.className = 'board-half';
+
+            const topLeft = document.createElement('div');
+            topLeft.className = 'board-row top-half';
+            for (let i = 12; i < 18; i++) topLeft.appendChild(createPoint(i, true));
+
+            const bottomLeft = document.createElement('div');
+            bottomLeft.className = 'board-row bottom-half';
+            for (let i = 11; i >= 6; i--) bottomLeft.appendChild(createPoint(i, false));
+
+            leftHalf.appendChild(topLeft);
+            leftHalf.appendChild(bottomLeft);
+
+            // 3. Center bar
+            const bar = document.createElement('div');
+            bar.className = 'board-bar';
+            bar.style.cursor = 'pointer';
+            bar.onclick = handleBarClick;
+
+            const barWhite = document.createElement('div');
+            barWhite.className = 'bar-checkers';
+            for (let n = 0; n < gameState.bar.white; n++) {
+                const c = document.createElement('div');
+                c.className = 'bar-checker white-checker checker';
+                if (selectedPoint === 'bar' && myRole === 'host') c.classList.add('selected');
+                barWhite.appendChild(c);
+            }
+            const barBlack = document.createElement('div');
+            barBlack.className = 'bar-checkers';
+            for (let n = 0; n < gameState.bar.black; n++) {
+                const c = document.createElement('div');
+                c.className = 'bar-checker black-checker checker';
+                if (selectedPoint === 'bar' && myRole === 'guest') c.classList.add('selected');
+                barBlack.appendChild(c);
+            }
+            bar.appendChild(barWhite);
+            bar.appendChild(barBlack);
+
+            // 4. Right half (points 19-24 top, 1-6 bottom)
+            const rightHalf = document.createElement('div');
+            rightHalf.className = 'board-half';
+
+            const topRight = document.createElement('div');
+            topRight.className = 'board-row top-half';
+            for (let i = 18; i < 24; i++) topRight.appendChild(createPoint(i, true));
+
+            const bottomRight = document.createElement('div');
+            bottomRight.className = 'board-row bottom-half';
+            for (let i = 5; i >= 0; i--) bottomRight.appendChild(createPoint(i, false));
+
+            rightHalf.appendChild(topRight);
+            rightHalf.appendChild(bottomRight);
+
+            // 5. Right bearing tray (for Host/White)
+            const hostTray = document.createElement('div');
+            hostTray.className = 'bearing-tray';
+            hostTray.id = 'tray-host';
+            for (let n = 0; n < gameState.borne.white; n++) {
+                const chip = document.createElement('div');
+                chip.className = 'bearing-chip white-chip';
+                hostTray.appendChild(chip);
+            }
+            hostTray.onclick = () => { if(myRole === 'host') handlePointClick('off'); };
+
+            // Highlight targets 
+            if (validTargetsMap.has('off')) {
+                const trayId = myRole === 'host' ? 'tray-host' : 'tray-guest';
+                const trayEl = trayId === 'tray-host' ? hostTray : guestTray;
+                trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,255,100,0.6), 0 0 10px rgba(100,255,100,0.4)';
+                trayEl.style.borderColor = 'rgba(100,255,100,0.5)';
+            }
+
+            // Assemble
+            boardDiv.appendChild(guestTray);
+            boardDiv.appendChild(leftHalf);
+            boardDiv.appendChild(bar);
+            boardDiv.appendChild(rightHalf);
+            boardDiv.appendChild(hostTray);
+
+            // Update HUD
+            updateHUD();
         }
 
         function handleBarClick() {
@@ -1385,71 +1429,7 @@
             }
         }
 
-        // Update renderBoard to include valid move highlights and bar clicks
-        const originalRenderBoard = renderBoard;
-        renderBoard = function() {
-            originalRenderBoard();
-            
-            // Highlight selected
-            if (selectedPoint !== null) {
-                if (selectedPoint === 'bar') {
-                    const barCheckers = document.querySelectorAll(myRole === 'host' ? '.bar-checkers .white-checker' : '.bar-checkers .black-checker');
-                    barCheckers.forEach(c => c.classList.add('selected'));
-                } else {
-                    const selEl = document.querySelector(`.point[data-index="${selectedPoint}"]`);
-                    if (selEl) {
-                        const checkers = selEl.querySelectorAll('.checker');
-                        if (checkers.length > 0) {
-                            checkers[checkers.length - 1].classList.add('selected');
-                        }
-                    }
-                }
-            }
-            
-            // Highlight targets 
-            for (let to of validTargetsMap.keys()) {
-                if (to === 'off') {
-                    const trayId = myRole === 'host' ? 'tray-host' : 'tray-guest';
-                    const trayEl = document.getElementById(trayId);
-                    if (trayEl) {
-                        trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,255,100,0.6), 0 0 10px rgba(100,255,100,0.4)';
-                        trayEl.style.borderColor = 'rgba(100,255,100,0.5)';
-                    }
-                } else {
-                    const targetEl = document.querySelector(`.point[data-index="${to}"]`);
-                    if (targetEl) targetEl.classList.add('valid-target');
-                }
-            }
-            
-            // Reset box shadow on trays if they are no longer targets? 
-            // Actually renderBoard clears the board so we should be fine, but trays are NOT cleared.
-            // Let's reset trays explicitly or in originalRenderBoard.
-            if (!validTargetsMap.has('off')) {
-                const hTray = document.getElementById('tray-host');
-                const gTray = document.getElementById('tray-guest');
-                if (hTray) { hTray.style.boxShadow = ''; hTray.style.borderColor = ''; }
-                if (gTray) { gTray.style.boxShadow = ''; gTray.style.borderColor = ''; }
-            }
-
-            // Update dice display with remaining moves
-            const diceArea = document.querySelector('.dice-area');
-            const movesLabel = document.createElement('div');
-            movesLabel.style.fontSize = '0.7rem';
-            movesLabel.style.color = 'var(--gold)';
-            movesLabel.style.marginTop = '4px';
-            movesLabel.textContent = gameState.movesLeft.length > 0 ? `MOVES: ${gameState.movesLeft.join(', ')}` : '';
-            
-            // Clear old label
-            const oldLabel = document.getElementById('moves-left-label');
-            if (oldLabel) oldLabel.remove();
-            movesLabel.id = 'moves-left-label';
-            diceArea.appendChild(movesLabel);
-
-            // Make bar clickable
-            const bar = document.querySelector('.board-bar');
-            bar.style.cursor = 'pointer';
-            bar.onclick = handleBarClick;
-        };
+        // Done
     </script>
 </body>
 </html>
