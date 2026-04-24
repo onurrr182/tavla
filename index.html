@@ -714,6 +714,8 @@
                     <span id="conn-label">Waiting…</span>
                 </div>
                 <div class="hud-id"><span>ID:</span><span id="display-id">...</span></div>
+                <button class="btn-secondary btn-sm" onclick="location.reload()" style="width:auto; margin-left:10px">Reset Game</button>
+                <button class="btn-secondary btn-sm" onclick="console.table(gameState); console.log('MovesLeft:', gameState.movesLeft); console.log('MyRole:', myRole);" style="width:auto; margin-left:5px; opacity:0.3">Debug State</button>
             </div>
             <div class="dice-area">
                 <div class="die" id="die1" data-value="0"></div>
@@ -857,6 +859,8 @@
         function rollDice() {
             if (gameState.turn !== myRole || gameState.hasRolled) return;
             if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
+            invalidateCache();
+            
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
             
@@ -868,43 +872,23 @@
             }
             
             gameState.hasRolled = true;
-            renderDie('die1', d1);
-            renderDie('die2', d2);
+            console.log("Dice rolled:", gameState.dice, "Moves:", gameState.movesLeft);
+            renderDie('die1', d1, true);
+            renderDie('die2', d2, true);
             sync();
         }
 
         function endTurn() {
             if (gameState.turn !== myRole) return;
             if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
+            invalidateCache();
+            
             gameState.turn = myRole === 'host' ? 'guest' : 'host';
             gameState.hasRolled = false;
             gameState.dice = [];
             gameState.movesLeft = [];
+            console.log("Turn ended. Next turn:", gameState.turn);
             sync();
-        }
-
-        function renderDie(id, value) {
-            const die = document.getElementById(id);
-            die.setAttribute('data-value', value);
-            die.innerHTML = '';
-            die.classList.remove('rolling');
-            void die.offsetWidth; // reflow
-            die.classList.add('rolling');
-
-            const positions = {
-                1: ['c'],
-                2: ['tr', 'bl'],
-                3: ['tr', 'c', 'bl'],
-                4: ['tl', 'tr', 'bl', 'br'],
-                5: ['tl', 'tr', 'c', 'bl', 'br'],
-                6: ['tl', 'tr', 'ml', 'mr', 'bl', 'br']
-            };
-
-            (positions[value] || []).forEach(pos => {
-                const dot = document.createElement('div');
-                dot.className = `die-dot d-${pos}`;
-                die.appendChild(dot);
-            });
         }
 
         /* ── Board Rendering ── */
@@ -1117,6 +1101,10 @@
         function renderDie(idOrEl, value, animate = true) {
             const dieEl = (typeof idOrEl === 'string') ? document.getElementById(idOrEl) : idOrEl;
             if (!dieEl) return;
+            
+            // Optimization: skip if value hasn't changed and no animation requested
+            if (dieEl.getAttribute('data-value') == value && !animate && dieEl.innerHTML !== '') return;
+            
             dieEl.setAttribute('data-value', value);
             dieEl.innerHTML = '';
             if (animate) {
@@ -1142,26 +1130,36 @@
         let validTargetsMap = new Map(); // to Index -> { diceUsed: [] }
 
         function handlePointClick(i) {
-            if (gameState.turn !== myRole || !gameState.hasRolled) return;
+            console.log("Point clicked:", i, "Current selection:", selectedPoint);
+            if (gameState.turn !== myRole || !gameState.hasRolled) {
+                console.warn("Click ignored: not your turn or not rolled");
+                return;
+            }
 
             const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
             
             if (selectedPoint === null) {
                 // If pieces are on bar, MUST click bar first
                 if (piecesOnBar > 0) {
-                    triggerShake('conn-dot'); // Visual hint it's not point click time
+                    console.log("Must move from bar first");
+                    triggerShake('conn-dot');
                     return;
                 }
 
                 const val = gameState.board[i];
-                if (val === 0 || (myRole === 'host' && val < 0) || (myRole === 'guest' && val > 0)) return;
+                if (val === 0 || (myRole === 'host' && val < 0) || (myRole === 'guest' && val > 0)) {
+                    console.log("Cannot select: empty or opponent point");
+                    return;
+                }
 
                 selectedPoint = i;
                 highlightValidMoves(i);
+                console.log("Selected point:", i, "Valid targets:", [...validTargetsMap.keys()]);
                 renderBoard();
             } else {
                 // If i is already selected, deselect
                 if (selectedPoint === i) {
+                    console.log("Deselecting point");
                     selectedPoint = null;
                     validTargetsMap.clear();
                     renderBoard();
@@ -1170,16 +1168,18 @@
 
                 const moveInfo = validTargetsMap.get(typeof i === 'number' ? i : 'off');
                 if (moveInfo) {
+                    console.log("Executing move from", selectedPoint, "to", i, "using dice", moveInfo.diceUsed);
                     executeMove(selectedPoint, i, moveInfo.diceUsed);
                 } else {
                     // Selection handling
                     const val = gameState.board[i];
                     if (val !== 0 && ((myRole === 'host' && val > 0) || (myRole === 'guest' && val < 0))) {
+                        console.log("Switching selection to:", i);
                         selectedPoint = i;
                         highlightValidMoves(i);
                         renderBoard();
                     } else {
-                        // Attempted illegal move
+                        console.warn("Illegal move attempted to:", i);
                         triggerShake('board');
                         selectedPoint = null;
                         validTargetsMap.clear();
@@ -1259,6 +1259,7 @@
         function executeMove(from, to, diceUsed) {
             const player = myRole;
             const piece = player === 'host' ? 1 : -1;
+            invalidateCache();
 
             if (from === 'bar') {
                 if (player === 'host') gameState.bar.white--; else gameState.bar.black--;
