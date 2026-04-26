@@ -738,7 +738,6 @@
         let peer, conn;
         let myRole = 'host';
         let autoSkipTimer = null;
-        let movesCache = new Map();
         let gameState = {
             board: [2,0,0,0,0,-5, 0,-3,0,0,0,5, -5,0,0,0,3,0, 5,0,0,0,0,-2],
             turn: 'host',
@@ -748,11 +747,6 @@
             borne: { white: 0, black: 0 },
             hasRolled: false
         };
-
-        // Cache invalidation helper
-        function invalidateCache() {
-            movesCache.clear();
-        }
 
         function createGame() {
             console.log("createGame() called");
@@ -844,7 +838,6 @@
             conn.on('data', (data) => {
                 console.log("Data received:", data);
                 gameState = data;
-                invalidateCache();
                 sync();
             });
 
@@ -859,7 +852,6 @@
         function rollDice() {
             if (gameState.turn !== myRole || gameState.hasRolled) return;
             if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
-            invalidateCache();
             
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
@@ -881,7 +873,6 @@
         function endTurn() {
             if (gameState.turn !== myRole) return;
             if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
-            invalidateCache();
             
             gameState.turn = myRole === 'host' ? 'guest' : 'host';
             gameState.hasRolled = false;
@@ -1190,51 +1181,42 @@
         }
 
         function getValidMoves(from) {
-            const stateKey = `f:${from}_m:${gameState.movesLeft.join(',')}_b:${gameState.board.join(',')}_bar:${gameState.bar.white},${gameState.bar.black}`;
-            if (movesCache.has(stateKey)) return movesCache.get(stateKey);
-
             const results = new Map();
             if (gameState.movesLeft.length === 0) return results;
 
             const player = myRole;
-            const dice = [...gameState.movesLeft];
+            const uniqueDice = [...new Set(gameState.movesLeft)];
 
-            function findReachable(currentPos, remainingDice, usedDice) {
-                if (remainingDice.length === 0) return;
+            for (const d of uniqueDice) {
+                let to;
+                if (from === 'bar') {
+                    to = player === 'host' ? d - 1 : 24 - d;
+                } else {
+                    to = player === 'host' ? from + d : from - d;
+                }
 
-                // Try each unique available die
-                const uniqueDice = [...new Set(remainingDice)];
-                uniqueDice.forEach(d => {
-                    let to;
-                    if (currentPos === 'bar') {
-                        to = player === 'host' ? d - 1 : 24 - d;
-                    } else {
-                        to = player === 'host' ? currentPos + d : currentPos - d;
+                // Normal move to a valid board point
+                if (isValidTarget(to, player)) {
+                    if (!results.has(to)) {
+                        results.set(to, { diceUsed: [d] });
                     }
-
-                    // Check if this step is valid
-                    if (isValidTarget(to, player)) {
-                        const newUsed = [...usedDice, d];
-                        results.set(to, { diceUsed: newUsed });
-                        
-                        // Recursive for combined moves
-                        const nextDice = [...remainingDice];
-                        nextDice.splice(nextDice.indexOf(d), 1);
-                        findReachable(to, nextDice, newUsed);
-                    } else if (canBearOff(player) && currentPos !== 'bar') {
-                        // Bearing off check
-                        const isOff = (player === 'host' && (currentPos + d >= 24)) || 
-                                      (player === 'guest' && (currentPos - d < 0));
-                        if (isOff) {
-                            const newUsed = [...usedDice, d];
-                            results.set('off', { diceUsed: newUsed });
+                } else if (canBearOff(player) && from !== 'bar') {
+                    // Bearing off check
+                    const isOff = (player === 'host' && to >= 24) ||
+                                  (player === 'guest' && to < 0);
+                    if (isOff) {
+                        // Exact match always allowed; overshoot only if no checker further back
+                        const exactOff = (player === 'host' && to === 24) ||
+                                         (player === 'guest' && to === -1);
+                        if (exactOff || !hasCheckerFurtherBack(player, from)) {
+                            if (!results.has('off')) {
+                                results.set('off', { diceUsed: [d] });
+                            }
                         }
                     }
-                });
+                }
             }
 
-            findReachable(from, dice, []);
-            movesCache.set(stateKey, results);
             return results;
         }
 
@@ -1256,10 +1238,25 @@
             return true;
         }
 
+        // Returns true if there is a checker further from bearing-off than fromPos
+        function hasCheckerFurtherBack(player, fromPos) {
+            if (player === 'host') {
+                // Host bears off past point 23; "further back" = lower index
+                for (let i = 18; i < fromPos; i++) {
+                    if (gameState.board[i] > 0) return true;
+                }
+            } else {
+                // Guest bears off past point 0; "further back" = higher index
+                for (let i = 5; i > fromPos; i--) {
+                    if (gameState.board[i] < 0) return true;
+                }
+            }
+            return false;
+        }
+
         function executeMove(from, to, diceUsed) {
             const player = myRole;
             const piece = player === 'host' ? 1 : -1;
-            invalidateCache();
 
             if (from === 'bar') {
                 if (player === 'host') gameState.bar.white--; else gameState.bar.black--;
