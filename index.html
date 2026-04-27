@@ -1037,14 +1037,14 @@
             if (!listEl) return;
             listEl.innerHTML = '';
             if (availableGames.size === 0) {
-                listEl.innerHTML = '<div class="lobby-status">Aktif oyun bulunamadı. Bir tane oluştur!</div>';
+                listEl.innerHTML = `<div class="lobby-status">${t('lobbyEmpty')}</div>`;
                 return;
             }
             for (const [gameId] of availableGames) {
                 const card = document.createElement('div');
                 card.className = 'game-card';
                 const shortId = gameId.replace(GAME_PREFIX, '');
-                card.innerHTML = `<span class="game-card-id">${shortId}</span><span class="game-card-join">Katıl →</span>`;
+                card.innerHTML = `<span class="game-card-id">${shortId}</span><span class="game-card-join">${t('joinArrow')}</span>`;
                 card.onclick = () => joinGameById(gameId);
                 listEl.appendChild(card);
             }
@@ -1094,10 +1094,15 @@
             const fullId = GAME_PREFIX + shortId;
             myRole = 'host';
             stopLobbyScanning();
-            // Destroy the scan peer, create game peer with specific ID
-            if (peer) { peer.destroy(); peer = null; }
-            initPeer(fullId);
             document.getElementById('display-id').innerText = shortId;
+            // Destroy the scan peer, wait for cleanup, then create game peer
+            if (peer) {
+                peer.destroy();
+                peer = null;
+                setTimeout(() => initPeer(fullId), 600);
+            } else {
+                initPeer(fullId);
+            }
         }
 
         function joinGame() {
@@ -1164,14 +1169,14 @@
                 peer.on('error', (err) => {
                     console.error("PeerJS Error:", err);
                     if (err.type === 'peer-unavailable') {
-                        alert("Oyun bulunamadı. Başlamış veya süresi dolmuş olabilir.");
+                        alert(t('gameNotFound'));
                     } else if (err.type !== 'unavailable-id') {
-                        alert("Bağlantı hatası: " + err.type);
+                        alert(t('connError') + err.type);
                     }
                 });
             } catch (e) {
                 console.error("Failed to initialize Peer:", e);
-                alert("Bağlantı başlatılamadı.");
+                alert(t('connFailed'));
             }
         }
 
@@ -1183,7 +1188,7 @@
                 gc.classList.remove('hidden');
                 gc.classList.add('fade-in');
                 document.getElementById('conn-dot').classList.add('connected');
-                document.getElementById('conn-label').innerText = 'Bağlandı';
+                document.getElementById('conn-label').innerText = t('connected');
                 if (myRole === 'host') {
                     sync();
                 } else {
@@ -1201,7 +1206,7 @@
 
             conn.on('close', () => {
                 document.getElementById('conn-dot').classList.remove('connected');
-                document.getElementById('conn-label').innerText = 'Bağlantı kesildi';
+                document.getElementById('conn-label').innerText = t('disconnected');
             });
         }
 
@@ -1505,7 +1510,7 @@
             if (!gameState) return;
             const isMyTurn = gameState.turn === myRole;
             const turnLabel = document.getElementById('turn-label');
-            turnLabel.textContent = isMyTurn ? 'SENİN SIRAN' : 'RAKİBİN SIRASI';
+            turnLabel.textContent = isMyTurn ? t('yourTurn') : t('opponentTurn');
             turnLabel.style.color = isMyTurn ? 'var(--gold-light)' : '#6a6050';
             
             const anyPossible = isMyTurn && gameState.hasRolled ? isAnyMovePossible(myRole) : false;
@@ -1514,13 +1519,13 @@
             const rollBtn = document.getElementById('roll-btn');
             rollBtn.disabled = !isMyTurn;
             if (isMyTurn && gameState.hasRolled) {
-                rollBtn.textContent = 'Sırayı Bitir';
+                rollBtn.textContent = t('endTurn');
                 rollBtn.onclick = endTurn;
                 rollBtn.disabled = !canEnd;
                 rollBtn.style.opacity = canEnd ? '1' : '0.5';
                 rollBtn.style.cursor = canEnd ? 'pointer' : 'not-allowed';
             } else {
-                rollBtn.textContent = 'Zar At';
+                rollBtn.textContent = t('roll');
                 rollBtn.onclick = rollDice;
                 rollBtn.disabled = !isMyTurn;
                 rollBtn.style.opacity = isMyTurn ? '1' : '0.5';
@@ -1566,11 +1571,11 @@
             if (gameState.hasRolled) {
                 if (gameState.movesLeft.length > 0) {
                     if (anyPossible) {
-                        movesLabel.textContent = `HAMLE: ${gameState.movesLeft.join(', ')}`;
+                        movesLabel.textContent = `${t('moves')}: ${gameState.movesLeft.join(', ')}`;
                         movesLabel.style.color = 'var(--gold)';
                         if (autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
                     } else {
-                        movesLabel.textContent = 'HAMLE YOK - OTOMATİK GEÇİLİYOR...';
+                        movesLabel.textContent = t('noLegalMoves');
                         movesLabel.style.color = '#ff6b6b';
                         triggerShake('roll-btn');
                         if (!autoSkipTimer) {
@@ -1581,7 +1586,7 @@
                         }
                     }
                 } else {
-                    movesLabel.textContent = 'HAMLE KALMADI';
+                    movesLabel.textContent = t('noMovesLeft');
                     movesLabel.style.color = '#888';
                 }
             } else {
