@@ -694,6 +694,84 @@
             .hud { flex-wrap: wrap; gap: 8px; justify-content: center; }
         }
 
+        /* ── Lobby Game List ── */
+        .game-list {
+            max-height: 220px;
+            overflow-y: auto;
+            margin: 12px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .game-list::-webkit-scrollbar { width: 4px; }
+        .game-list::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
+
+        .game-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(212,175,55,0.06);
+            border: 1px solid rgba(212,175,55,0.15);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .game-card:hover {
+            background: rgba(212,175,55,0.12);
+            border-color: var(--gold);
+            transform: translateY(-1px);
+        }
+        .game-card-id {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            color: var(--gold-light);
+            letter-spacing: 3px;
+        }
+        .game-card-join {
+            font-size: 0.75rem;
+            color: var(--gold-dim);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .game-card:hover .game-card-join { color: var(--gold-light); }
+
+        .lobby-status {
+            font-size: 0.75rem;
+            color: #6a6050;
+            text-align: center;
+            padding: 16px 0;
+            letter-spacing: 0.5px;
+        }
+        .lobby-status .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(212,175,55,0.3);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .manual-join {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .manual-join input {
+            flex: 1;
+            font-size: 0.85rem;
+            padding: 8px 12px;
+        }
+        .manual-join button {
+            white-space: nowrap;
+            width: auto;
+            padding: 8px 16px;
+        }
+
         /* ── Animations ── */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -714,10 +792,15 @@
     <div id="setup">
         <p class="subtitle">Peer-to-Peer Backgammon</p>
         <button class="btn-primary" onclick="createGame()" id="create-btn">Create Game</button>
-        <div class="divider">or join a friend</div>
-        <input type="text" id="joinId" placeholder="ABCD" maxlength="4">
-        <div style="height:10px"></div>
-        <button class="btn-secondary" onclick="joinGame()" id="join-btn">Join Game</button>
+        <div class="divider">active games</div>
+        <div id="game-list" class="game-list">
+            <div class="lobby-status" id="lobby-status"><span class="spinner"></span>Searching for games…</div>
+        </div>
+        <div class="divider">or enter code</div>
+        <div class="manual-join">
+            <input type="text" id="joinId" placeholder="ABCD" maxlength="4">
+            <button class="btn-secondary btn-sm" onclick="joinGame()" id="join-btn">Join</button>
+        </div>
     </div>
 
     <!-- ── Game Area ── -->
@@ -754,6 +837,10 @@
         let peer, conn;
         let myRole = 'host';
         let autoSkipTimer = null;
+        let lobbyPeer = null;
+        let isLobby = false;
+        let availableGames = new Map();
+        let scanInterval = null;
         let gameState = {
             board: [2,0,0,0,0,-5, 0,-3,0,0,0,5, -5,0,0,0,3,0, 5,0,0,0,0,-2],
             turn: 'host',
@@ -764,29 +851,128 @@
             hasRolled: false
         };
 
+        const LOBBY_ID = 'TAVLA-LOBBY-V1';
+        const GAME_PREFIX = 'TV-';
+
+        // ── Lobby system ──
+        function startLobbyScanning() {
+            scanForGames();
+            scanInterval = setInterval(scanForGames, 4000);
+        }
+
+        function stopLobbyScanning() {
+            if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+        }
+
+        function scanForGames() {
+            if (!peer || !peer.open) return;
+            const lc = peer.connect(LOBBY_ID, { reliable: true });
+            lc.on('open', () => { lc.send({ type: 'list' }); });
+            lc.on('data', (data) => {
+                if (data.type === 'games') {
+                    availableGames.clear();
+                    const now = Date.now();
+                    for (const [id, ts] of Object.entries(data.games)) {
+                        if (now - ts < 30000) availableGames.set(id, ts);
+                    }
+                    renderGameList();
+                }
+                lc.close();
+            });
+            lc.on('error', () => { renderGameList(); });
+            setTimeout(() => { try { lc.close(); } catch(e) {} }, 2500);
+        }
+
+        function renderGameList() {
+            const listEl = document.getElementById('game-list');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            if (availableGames.size === 0) {
+                listEl.innerHTML = '<div class="lobby-status">No active games found. Create one!</div>';
+                return;
+            }
+            for (const [gameId] of availableGames) {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                const shortId = gameId.replace(GAME_PREFIX, '');
+                card.innerHTML = `<span class="game-card-id">${shortId}</span><span class="game-card-join">Join →</span>`;
+                card.onclick = () => joinGameById(gameId);
+                listEl.appendChild(card);
+            }
+        }
+
+        function tryBecomeLobby() {
+            try {
+                lobbyPeer = new Peer(LOBBY_ID);
+                lobbyPeer.on('open', () => { console.log("I am the lobby!"); isLobby = true; });
+                lobbyPeer.on('connection', (c) => {
+                    c.on('data', (msg) => {
+                        if (msg.type === 'list') {
+                            const now = Date.now();
+                            for (const [id, ts] of availableGames) {
+                                if (now - ts > 30000) availableGames.delete(id);
+                            }
+                            c.send({ type: 'games', games: Object.fromEntries(availableGames) });
+                        } else if (msg.type === 'register') {
+                            availableGames.set(msg.gameId, Date.now());
+                        } else if (msg.type === 'unregister') {
+                            availableGames.delete(msg.gameId);
+                        }
+                    });
+                });
+                lobbyPeer.on('error', () => { isLobby = false; });
+            } catch (e) { console.log("Could not become lobby:", e); }
+        }
+
+        function registerGameWithLobby(gameId) {
+            if (isLobby) { availableGames.set(gameId, Date.now()); return; }
+            if (!peer || !peer.open) return;
+            const lc = peer.connect(LOBBY_ID, { reliable: true });
+            lc.on('open', () => { lc.send({ type: 'register', gameId }); setTimeout(() => lc.close(), 1000); });
+        }
+
+        function unregisterGameFromLobby(gameId) {
+            if (isLobby) { availableGames.delete(gameId); return; }
+            if (!peer || !peer.open) return;
+            const lc = peer.connect(LOBBY_ID, { reliable: true });
+            lc.on('open', () => { lc.send({ type: 'unregister', gameId }); setTimeout(() => lc.close(), 1000); });
+        }
+
+        // ── Game creation & joining ──
         function createGame() {
             console.log("createGame() called");
-            const id = generateId();
-            initPeer(id);
+            const shortId = generateId();
+            const fullId = GAME_PREFIX + shortId;
             myRole = 'host';
-            document.getElementById('display-id').innerText = id;
+            stopLobbyScanning();
+            // Destroy the scan peer, create game peer with specific ID
+            if (peer) { peer.destroy(); peer = null; }
+            initPeer(fullId);
+            document.getElementById('display-id').innerText = shortId;
         }
 
         function joinGame() {
             const id = document.getElementById('joinId').value.toUpperCase().trim();
             if (id.length < 2) return;
-            console.log("Joining game:", id);
-            initPeer();
+            joinGameById(GAME_PREFIX + id);
+        }
+
+        function joinGameById(fullId) {
+            console.log("Joining game:", fullId);
+            stopLobbyScanning();
             myRole = 'guest';
-            
-            // Wait for peer to be open before connecting
-            const checkPeer = setInterval(() => {
-                if (peer && peer.open) {
-                    clearInterval(checkPeer);
-                    conn = peer.connect(id);
-                    setupConn();
-                }
-            }, 500);
+            if (peer && peer.open) {
+                conn = peer.connect(fullId);
+                setupConn();
+            } else {
+                const checkPeer = setInterval(() => {
+                    if (peer && peer.open) {
+                        clearInterval(checkPeer);
+                        conn = peer.connect(fullId);
+                        setupConn();
+                    }
+                }, 300);
+            }
         }
 
         function generateId() {
@@ -798,61 +984,66 @@
 
         function initPeer(id = null) {
             console.log("initPeer called with id:", id);
-            if (peer) {
-                console.warn("Peer already exists, skipping init");
-                return;
-            }
+            if (peer) { console.warn("Peer already exists, skipping init"); return; }
             try {
-                if (typeof Peer === 'undefined') {
-                    throw new Error("PeerJS library not loaded! Check your internet or script tag.");
-                }
+                if (typeof Peer === 'undefined') throw new Error("PeerJS library not loaded!");
                 peer = id ? new Peer(id) : new Peer();
-                console.log("Peer instance created:", peer);
                 
                 peer.on('open', () => {
                     console.log("EVENT: peer.on('open') - ID:", peer.id);
                     document.getElementById('setup').classList.add('hidden');
-                    const gameContainer = document.getElementById('game-container');
-                    gameContainer.classList.remove('hidden');
-                    gameContainer.classList.add('fade-in');
+                    const gc = document.getElementById('game-container');
+                    gc.classList.remove('hidden');
+                    gc.classList.add('fade-in');
                     renderBoard();
                     if (!id) document.getElementById('display-id').innerText = peer.id.substring(0, 4);
+                    if (myRole === 'host') {
+                        registerGameWithLobby(peer.id);
+                        setInterval(() => {
+                            if (myRole === 'host' && (!conn || !conn.open)) registerGameWithLobby(peer.id);
+                        }, 10000);
+                    }
                 });
 
                 peer.on('connection', (c) => {
                     console.log("EVENT: peer.on('connection') from:", c.peer);
                     conn = c;
                     setupConn();
+                    unregisterGameFromLobby(peer.id);
                 });
 
                 peer.on('error', (err) => {
                     console.error("PeerJS Error:", err);
                     if (err.type === 'peer-unavailable') {
-                        alert("Peer not found. Check the ID.");
-                    } else {
+                        alert("Game not found. It may have started or expired.");
+                    } else if (err.type !== 'unavailable-id') {
                         alert("Connection error: " + err.type);
                     }
                 });
             } catch (e) {
                 console.error("Failed to initialize Peer:", e);
-                alert("Failed to initialize peer connection. Check internet or browser compatibility.");
+                alert("Failed to initialize peer connection.");
             }
         }
 
         function setupConn() {
             conn.on('open', () => {
-                console.log("Connection established with peer");
+                console.log("Connection established");
+                document.getElementById('setup').classList.add('hidden');
+                const gc = document.getElementById('game-container');
+                gc.classList.remove('hidden');
+                gc.classList.add('fade-in');
                 document.getElementById('conn-dot').classList.add('connected');
                 document.getElementById('conn-label').innerText = 'Connected';
                 if (myRole === 'host') {
                     sync();
                 } else {
+                    document.getElementById('display-id').innerText = peer.id.substring(0, 4);
                     renderBoard();
                 }
             });
 
             conn.on('data', (data) => {
-                console.log("Data received:", data);
                 gameState = data;
                 selectedPoint = null;
                 validTargetsMap.clear();
@@ -860,11 +1051,20 @@
             });
 
             conn.on('close', () => {
-                console.log("Peer connection closed");
                 document.getElementById('conn-dot').classList.remove('connected');
                 document.getElementById('conn-label').innerText = 'Disconnected';
             });
         }
+
+        // ── Initialize lobby on page load ──
+        (function initLobby() {
+            tryBecomeLobby();
+            peer = new Peer();
+            peer.on('open', () => { startLobbyScanning(); });
+            peer.on('error', (e) => {
+                if (e.type !== 'peer-unavailable') console.log("Scan peer error:", e);
+            });
+        })();
 
         /* ── Dice & Turns ── */
         function rollDice() {
@@ -901,84 +1101,115 @@
         }
 
         /* ── Board Rendering ── */
-        function renderBoard() {
-            // Render synchronously for immediate click feedback (no rAF delay)
-            renderBoardInternal();
+        let boardBuilt = false;
+        const pointEls = new Array(24);
+
+        // Build static board structure once (SVGs, containers, click handlers)
+        function buildBoardOnce() {
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+
+            // Guest tray
+            const guestTray = document.createElement('div');
+            guestTray.className = 'bearing-tray';
+            guestTray.id = 'tray-guest';
+            guestTray.onclick = () => { if(myRole === 'guest') handlePointClick('off'); };
+
+            // Left half
+            const leftHalf = document.createElement('div');
+            leftHalf.className = 'board-half';
+            const topLeft = document.createElement('div');
+            topLeft.className = 'board-row top-half';
+            for (let i = 12; i < 18; i++) topLeft.appendChild(buildStaticPoint(i, true));
+            const bottomLeft = document.createElement('div');
+            bottomLeft.className = 'board-row bottom-half';
+            for (let i = 11; i >= 6; i--) bottomLeft.appendChild(buildStaticPoint(i, false));
+            leftHalf.appendChild(topLeft);
+            leftHalf.appendChild(bottomLeft);
+
+            // Bar
+            const bar = document.createElement('div');
+            bar.className = 'board-bar';
+            bar.style.cursor = 'pointer';
+            bar.id = 'board-bar';
+            bar.onclick = handleBarClick;
+            const barWhite = document.createElement('div');
+            barWhite.className = 'bar-checkers';
+            barWhite.id = 'bar-white';
+            const barBlack = document.createElement('div');
+            barBlack.className = 'bar-checkers';
+            barBlack.id = 'bar-black';
+            bar.appendChild(barWhite);
+            bar.appendChild(barBlack);
+
+            // Right half
+            const rightHalf = document.createElement('div');
+            rightHalf.className = 'board-half';
+            const topRight = document.createElement('div');
+            topRight.className = 'board-row top-half';
+            for (let i = 18; i < 24; i++) topRight.appendChild(buildStaticPoint(i, true));
+            const bottomRight = document.createElement('div');
+            bottomRight.className = 'board-row bottom-half';
+            for (let i = 5; i >= 0; i--) bottomRight.appendChild(buildStaticPoint(i, false));
+            rightHalf.appendChild(topRight);
+            rightHalf.appendChild(bottomRight);
+
+            // Host tray
+            const hostTray = document.createElement('div');
+            hostTray.className = 'bearing-tray';
+            hostTray.id = 'tray-host';
+            hostTray.onclick = () => { if(myRole === 'host') handlePointClick('off'); };
+
+            boardDiv.appendChild(guestTray);
+            boardDiv.appendChild(leftHalf);
+            boardDiv.appendChild(bar);
+            boardDiv.appendChild(rightHalf);
+            boardDiv.appendChild(hostTray);
+            boardBuilt = true;
         }
 
-        function createPoint(i, isTopHalf) {
+        function buildStaticPoint(i, isTopHalf) {
             const pt = document.createElement('div');
             pt.className = 'point';
             pt.setAttribute('data-index', i);
-            if (validTargetsMap.has(i)) pt.classList.add('valid-target');
-            if (selectedPoint === i) pt.classList.add('point-selected');
 
-            // Triangle
+            // Triangle SVG (static — never rebuilt)
             const triWrap = document.createElement('div');
             triWrap.className = 'point-triangle';
-
             const isDark = i % 2 === 0;
             const darkFill = isDark ? '#8B1A1A' : '#F5F0E1';
             const darkStroke = isDark ? '#6b1010' : '#d5ccb5';
-
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('viewBox', '0 0 100 200');
             svg.setAttribute('preserveAspectRatio', 'none');
-
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
             const gradId = `tg-${i}`;
             const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
             grad.setAttribute('id', gradId);
             grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
             grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
-
             const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
             s1.setAttribute('offset', '0%');
             s1.setAttribute('stop-color', isTopHalf ? darkFill : shadeColor(darkFill, -12));
             const s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
             s2.setAttribute('offset', '100%');
             s2.setAttribute('stop-color', isTopHalf ? shadeColor(darkFill, -12) : darkFill);
-
-            grad.appendChild(s1);
-            grad.appendChild(s2);
-            defs.appendChild(grad);
-            svg.appendChild(defs);
-
+            grad.appendChild(s1); grad.appendChild(s2);
+            defs.appendChild(grad); svg.appendChild(defs);
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', isTopHalf ? 'M 5 0 L 95 0 L 50 195 Z' : 'M 5 200 L 95 200 L 50 5 Z');
             path.setAttribute('fill', `url(#${gradId})`);
             path.setAttribute('stroke', darkStroke);
             path.setAttribute('stroke-width', '1.2');
             svg.appendChild(path);
-
             triWrap.appendChild(svg);
             pt.appendChild(triWrap);
 
-            // Checkers
-            const val = gameState.board[i];
-            const count = Math.abs(val);
-            const color = val > 0 ? 'white' : 'black';
-
-            if (count > 0) {
-                const stack = document.createElement('div');
-                stack.className = 'checkers-stack';
-
-                const maxShow = Math.min(count, 5);
-                for (let n = 0; n < maxShow; n++) {
-                    const checker = document.createElement('div');
-                    checker.className = `checker ${color}-checker`;
-                    if (selectedPoint === i && n === maxShow - 1) checker.classList.add('selected');
-
-                    if (count > 5 && n === maxShow - 1) {
-                        const badge = document.createElement('span');
-                        badge.className = 'checker-count';
-                        badge.textContent = count;
-                        checker.appendChild(badge);
-                    }
-                    stack.appendChild(checker);
-                }
-                pt.appendChild(stack);
-            }
+            // Checkers container (dynamic content)
+            const stack = document.createElement('div');
+            stack.className = 'checkers-stack';
+            stack.id = `stack-${i}`;
+            pt.appendChild(stack);
 
             // Point number
             const num = document.createElement('div');
@@ -986,12 +1217,101 @@
             num.textContent = i + 1;
             pt.appendChild(num);
 
+            // Target indicator
             const indicator = document.createElement('div');
             indicator.className = 'target-indicator';
             pt.appendChild(indicator);
 
             pt.onclick = () => handlePointClick(i);
+            pointEls[i] = pt;
             return pt;
+        }
+
+        // Fast update: only touches checkers, classes, bar, trays, HUD
+        function updateBoardState() {
+            // Update points
+            for (let i = 0; i < 24; i++) {
+                const pt = pointEls[i];
+                pt.classList.toggle('valid-target', validTargetsMap.has(i));
+                pt.classList.toggle('point-selected', selectedPoint === i);
+
+                const stack = document.getElementById(`stack-${i}`);
+                stack.innerHTML = '';
+                const val = gameState.board[i];
+                const count = Math.abs(val);
+                if (count > 0) {
+                    const color = val > 0 ? 'white' : 'black';
+                    const maxShow = Math.min(count, 5);
+                    for (let n = 0; n < maxShow; n++) {
+                        const checker = document.createElement('div');
+                        checker.className = `checker ${color}-checker`;
+                        if (selectedPoint === i && n === maxShow - 1) checker.classList.add('selected');
+                        if (count > 5 && n === maxShow - 1) {
+                            const badge = document.createElement('span');
+                            badge.className = 'checker-count';
+                            badge.textContent = count;
+                            checker.appendChild(badge);
+                        }
+                        stack.appendChild(checker);
+                    }
+                }
+            }
+
+            // Update bar
+            const barWhite = document.getElementById('bar-white');
+            const barBlack = document.getElementById('bar-black');
+            barWhite.innerHTML = '';
+            barBlack.innerHTML = '';
+            for (let n = 0; n < gameState.bar.white; n++) {
+                const c = document.createElement('div');
+                c.className = 'bar-checker white-checker checker';
+                if (selectedPoint === 'bar' && myRole === 'host') c.classList.add('selected');
+                barWhite.appendChild(c);
+            }
+            for (let n = 0; n < gameState.bar.black; n++) {
+                const c = document.createElement('div');
+                c.className = 'bar-checker black-checker checker';
+                if (selectedPoint === 'bar' && myRole === 'guest') c.classList.add('selected');
+                barBlack.appendChild(c);
+            }
+
+            // Update trays
+            const guestTray = document.getElementById('tray-guest');
+            const hostTray = document.getElementById('tray-host');
+            guestTray.innerHTML = '';
+            hostTray.innerHTML = '';
+            for (let n = 0; n < gameState.borne.black; n++) {
+                const chip = document.createElement('div');
+                chip.className = 'bearing-chip black-chip';
+                guestTray.appendChild(chip);
+            }
+            for (let n = 0; n < gameState.borne.white; n++) {
+                const chip = document.createElement('div');
+                chip.className = 'bearing-chip white-chip';
+                hostTray.appendChild(chip);
+            }
+
+            // Highlight bearing off target
+            guestTray.style.boxShadow = '';
+            guestTray.style.borderColor = '';
+            hostTray.style.boxShadow = '';
+            hostTray.style.borderColor = '';
+            if (validTargetsMap.has('off')) {
+                const trayEl = myRole === 'host' ? hostTray : guestTray;
+                trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,255,100,0.6), 0 0 10px rgba(100,255,100,0.4)';
+                trayEl.style.borderColor = 'rgba(100,255,100,0.5)';
+            }
+
+            updateHUD();
+        }
+
+        function renderBoard() {
+            if (!boardBuilt) buildBoardOnce();
+            updateBoardState();
+        }
+
+        function renderBoardInternal() {
+            renderBoard();
         }
 
         function shadeColor(hex, percent) {
@@ -1005,6 +1325,18 @@
             const G = Math.round((t - g) * p) + g;
             const B = Math.round((t - b) * p) + b;
             return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
+        }
+
+        function handleBarClick() {
+            if (gameState.turn !== myRole || !gameState.hasRolled) return;
+            const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
+            if (piecesOnBar > 0) {
+                selectedPoint = 'bar';
+                highlightValidMoves('bar');
+                renderBoard();
+            } else {
+                triggerShake('conn-dot');
+            }
         }
 
         function isAnyMovePossible(player) {
@@ -1112,8 +1444,6 @@
         function renderDie(idOrEl, value, animate = true) {
             const dieEl = (typeof idOrEl === 'string') ? document.getElementById(idOrEl) : idOrEl;
             if (!dieEl) return;
-            
-            // Optimization: skip if value hasn't changed and no animation requested
             if (dieEl.getAttribute('data-value') == value && !animate && dieEl.innerHTML !== '') return;
             
             dieEl.setAttribute('data-value', value);
@@ -1138,7 +1468,7 @@
 
         /* ── Game Logic ── */
         let selectedPoint = null;
-        let validTargetsMap = new Map(); // to Index -> { diceUsed: [] }
+        let validTargetsMap = new Map();
 
         function handlePointClick(i) {
             console.log("Point clicked:", i, "Current selection:", selectedPoint);
@@ -1150,7 +1480,6 @@
             const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
             
             if (selectedPoint === null) {
-                // If pieces are on bar, MUST click bar first
                 if (piecesOnBar > 0) {
                     console.log("Must move from bar first");
                     triggerShake('conn-dot');
@@ -1168,7 +1497,6 @@
                 console.log("Selected point:", i, "Valid targets:", [...validTargetsMap.keys()]);
                 renderBoard();
             } else {
-                // If i is already selected, deselect
                 if (selectedPoint === i) {
                     console.log("Deselecting point");
                     selectedPoint = null;
@@ -1182,7 +1510,6 @@
                     console.log("Executing move from", selectedPoint, "to", i, "using dice", moveInfo.diceUsed);
                     executeMove(selectedPoint, i, moveInfo.diceUsed);
                 } else {
-                    // Selection handling
                     const val = gameState.board[i];
                     if (val !== 0 && ((myRole === 'host' && val > 0) || (myRole === 'guest' && val < 0))) {
                         console.log("Switching selection to:", i);
@@ -1215,17 +1542,14 @@
                     to = player === 'host' ? from + d : from - d;
                 }
 
-                // Normal move to a valid board point
                 if (isValidTarget(to, player)) {
                     if (!results.has(to)) {
                         results.set(to, { diceUsed: [d] });
                     }
                 } else if (canBearOff(player) && from !== 'bar') {
-                    // Bearing off check
                     const isOff = (player === 'host' && to >= 24) ||
                                   (player === 'guest' && to < 0);
                     if (isOff) {
-                        // Exact match always allowed; overshoot only if no checker further back
                         const exactOff = (player === 'host' && to === 24) ||
                                          (player === 'guest' && to === -1);
                         if (exactOff || !hasCheckerFurtherBack(player, from)) {
@@ -1258,15 +1582,12 @@
             return true;
         }
 
-        // Returns true if there is a checker further from bearing-off than fromPos
         function hasCheckerFurtherBack(player, fromPos) {
             if (player === 'host') {
-                // Host bears off past point 23; "further back" = lower index
                 for (let i = 18; i < fromPos; i++) {
                     if (gameState.board[i] > 0) return true;
                 }
             } else {
-                // Guest bears off past point 0; "further back" = higher index
                 for (let i = 5; i > fromPos; i--) {
                     if (gameState.board[i] < 0) return true;
                 }
@@ -1322,142 +1643,15 @@
             setTimeout(() => el.style.transform = 'translateX(0)', 150);
         }
 
-        let syncScheduled = false;
-        let renderScheduled = false;
-
-        // Send state to peer AND render
+        // Send state to peer AND render — synchronous for immediate feedback
         function sync() {
-            if (syncScheduled) return;
-            syncScheduled = true;
-            requestAnimationFrame(() => {
-                renderBoardInternal();
-                if (conn && conn.open) conn.send(gameState);
-                syncScheduled = false;
-            });
+            renderBoardInternal();
+            if (conn && conn.open) conn.send(gameState);
         }
 
-        // Render only (no network send) — used for local UI updates and incoming data
+        // Render only (no network send) — used for incoming data
         function renderOnly() {
-            if (renderScheduled) return;
-            renderScheduled = true;
-            requestAnimationFrame(() => {
-                renderBoardInternal();
-                renderScheduled = false;
-            });
-        }
-
-        // Rename original renderBoard to renderBoardInternal
-        function renderBoardInternal() {
-            const boardDiv = document.getElementById('board');
-            if (!boardDiv) return;
-            boardDiv.innerHTML = '';
-
-            // 1. Left bearing tray (for Guest/Black)
-            const guestTray = document.createElement('div');
-            guestTray.className = 'bearing-tray';
-            guestTray.id = 'tray-guest';
-            for (let n = 0; n < gameState.borne.black; n++) {
-                const chip = document.createElement('div');
-                chip.className = 'bearing-chip black-chip';
-                guestTray.appendChild(chip);
-            }
-            guestTray.onclick = () => { if(myRole === 'guest') handlePointClick('off'); };
-
-            // 2. Left half (points 13-18 top, 7-12 bottom)
-            const leftHalf = document.createElement('div');
-            leftHalf.className = 'board-half';
-
-            const topLeft = document.createElement('div');
-            topLeft.className = 'board-row top-half';
-            for (let i = 12; i < 18; i++) topLeft.appendChild(createPoint(i, true));
-
-            const bottomLeft = document.createElement('div');
-            bottomLeft.className = 'board-row bottom-half';
-            for (let i = 11; i >= 6; i--) bottomLeft.appendChild(createPoint(i, false));
-
-            leftHalf.appendChild(topLeft);
-            leftHalf.appendChild(bottomLeft);
-
-            // 3. Center bar
-            const bar = document.createElement('div');
-            bar.className = 'board-bar';
-            bar.style.cursor = 'pointer';
-            bar.onclick = handleBarClick;
-
-            const barWhite = document.createElement('div');
-            barWhite.className = 'bar-checkers';
-            for (let n = 0; n < gameState.bar.white; n++) {
-                const c = document.createElement('div');
-                c.className = 'bar-checker white-checker checker';
-                if (selectedPoint === 'bar' && myRole === 'host') c.classList.add('selected');
-                barWhite.appendChild(c);
-            }
-            const barBlack = document.createElement('div');
-            barBlack.className = 'bar-checkers';
-            for (let n = 0; n < gameState.bar.black; n++) {
-                const c = document.createElement('div');
-                c.className = 'bar-checker black-checker checker';
-                if (selectedPoint === 'bar' && myRole === 'guest') c.classList.add('selected');
-                barBlack.appendChild(c);
-            }
-            bar.appendChild(barWhite);
-            bar.appendChild(barBlack);
-
-            // 4. Right half (points 19-24 top, 1-6 bottom)
-            const rightHalf = document.createElement('div');
-            rightHalf.className = 'board-half';
-
-            const topRight = document.createElement('div');
-            topRight.className = 'board-row top-half';
-            for (let i = 18; i < 24; i++) topRight.appendChild(createPoint(i, true));
-
-            const bottomRight = document.createElement('div');
-            bottomRight.className = 'board-row bottom-half';
-            for (let i = 5; i >= 0; i--) bottomRight.appendChild(createPoint(i, false));
-
-            rightHalf.appendChild(topRight);
-            rightHalf.appendChild(bottomRight);
-
-            // 5. Right bearing tray (for Host/White)
-            const hostTray = document.createElement('div');
-            hostTray.className = 'bearing-tray';
-            hostTray.id = 'tray-host';
-            for (let n = 0; n < gameState.borne.white; n++) {
-                const chip = document.createElement('div');
-                chip.className = 'bearing-chip white-chip';
-                hostTray.appendChild(chip);
-            }
-            hostTray.onclick = () => { if(myRole === 'host') handlePointClick('off'); };
-
-            // Highlight targets 
-            if (validTargetsMap.has('off')) {
-                const trayId = myRole === 'host' ? 'tray-host' : 'tray-guest';
-                const trayEl = trayId === 'tray-host' ? hostTray : guestTray;
-                trayEl.style.boxShadow = 'inset 0 0 15px rgba(100,255,100,0.6), 0 0 10px rgba(100,255,100,0.4)';
-                trayEl.style.borderColor = 'rgba(100,255,100,0.5)';
-            }
-
-            // Assemble
-            boardDiv.appendChild(guestTray);
-            boardDiv.appendChild(leftHalf);
-            boardDiv.appendChild(bar);
-            boardDiv.appendChild(rightHalf);
-            boardDiv.appendChild(hostTray);
-
-            // Update HUD
-            updateHUD();
-        }
-
-        function handleBarClick() {
-            if (gameState.turn !== myRole || !gameState.hasRolled) return;
-            const piecesOnBar = myRole === 'host' ? gameState.bar.white : gameState.bar.black;
-            if (piecesOnBar > 0) {
-                selectedPoint = 'bar';
-                highlightValidMoves('bar');
-                renderBoard();
-            } else {
-                triggerShake('conn-dot');
-            }
+            renderBoardInternal();
         }
 
         // Done
