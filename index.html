@@ -983,7 +983,8 @@
         document.addEventListener('DOMContentLoaded', () => setLang(currentLang));
 
         /* ── PeerJS & Game State ── */
-        let peer, conn;
+        let peer = null, conn = null;
+        let scanPeer = null;
         let myRole = 'host';
         let autoSkipTimer = null;
         let lobbyPeer = null;
@@ -1011,11 +1012,20 @@
 
         function stopLobbyScanning() {
             if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+            if (scanPeer) {
+                try { scanPeer.destroy(); } catch (e) {}
+                scanPeer = null;
+            }
+            if (lobbyPeer) {
+                try { lobbyPeer.destroy(); } catch (e) {}
+                lobbyPeer = null;
+                isLobby = false;
+            }
         }
 
         function scanForGames() {
-            if (!peer || !peer.open) return;
-            const lc = peer.connect(LOBBY_ID, { reliable: true });
+            if (!scanPeer || !scanPeer.open) return;
+            const lc = scanPeer.connect(LOBBY_ID, { reliable: true });
             lc.on('open', () => { lc.send({ type: 'list' }); });
             lc.on('data', (data) => {
                 if (data.type === 'games') {
@@ -1095,14 +1105,11 @@
             myRole = 'host';
             stopLobbyScanning();
             document.getElementById('display-id').innerText = shortId;
-            // Destroy the scan peer, wait for cleanup, then create game peer
-            if (peer) {
-                peer.destroy();
-                peer = null;
-                setTimeout(() => initPeer(fullId), 600);
-            } else {
+            
+            // Wait 500ms for background WebSockets to fully close to prevent rate-limiting
+            setTimeout(() => {
                 initPeer(fullId);
-            }
+            }, 500);
         }
 
         function joinGame() {
@@ -1119,13 +1126,7 @@
                 conn = peer.connect(fullId);
                 setupConn();
             } else {
-                const checkPeer = setInterval(() => {
-                    if (peer && peer.open) {
-                        clearInterval(checkPeer);
-                        conn = peer.connect(fullId);
-                        setupConn();
-                    }
-                }, 300);
+                initPeer(null, fullId);
             }
         }
 
@@ -1136,7 +1137,7 @@
             return id;
         }
 
-        function initPeer(id = null) {
+        function initPeer(id = null, connectToId = null) {
             console.log("initPeer called with id:", id);
             if (peer) { console.warn("Peer already exists, skipping init"); return; }
             try {
@@ -1145,17 +1146,23 @@
                 
                 peer.on('open', () => {
                     console.log("EVENT: peer.on('open') - ID:", peer.id);
-                    document.getElementById('setup').classList.add('hidden');
-                    const gc = document.getElementById('game-container');
-                    gc.classList.remove('hidden');
-                    gc.classList.add('fade-in');
-                    renderBoard();
-                    if (!id) document.getElementById('display-id').innerText = peer.id.substring(0, 4);
-                    if (myRole === 'host') {
-                        registerGameWithLobby(peer.id);
-                        setInterval(() => {
-                            if (myRole === 'host' && (!conn || !conn.open)) registerGameWithLobby(peer.id);
-                        }, 10000);
+                    
+                    if (connectToId) {
+                        conn = peer.connect(connectToId);
+                        setupConn();
+                    } else {
+                        document.getElementById('setup').classList.add('hidden');
+                        const gc = document.getElementById('game-container');
+                        gc.classList.remove('hidden');
+                        gc.classList.add('fade-in');
+                        renderBoard();
+                        if (!id) document.getElementById('display-id').innerText = peer.id.substring(0, 4);
+                        if (myRole === 'host') {
+                            registerGameWithLobby(peer.id);
+                            setInterval(() => {
+                                if (myRole === 'host' && (!conn || !conn.open)) registerGameWithLobby(peer.id);
+                            }, 10000);
+                        }
                     }
                 });
 
@@ -1213,9 +1220,9 @@
         // ── Initialize lobby on page load ──
         (function initLobby() {
             tryBecomeLobby();
-            peer = new Peer();
-            peer.on('open', () => { startLobbyScanning(); });
-            peer.on('error', (e) => {
+            scanPeer = new Peer();
+            scanPeer.on('open', () => { startLobbyScanning(); });
+            scanPeer.on('error', (e) => {
                 if (e.type !== 'peer-unavailable') console.log("Scan peer error:", e);
             });
         })();
