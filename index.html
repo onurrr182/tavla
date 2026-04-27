@@ -783,23 +783,59 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0); }
             50% { box-shadow: 0 0 0 6px rgba(212,175,55,0.1); }
         }
+        /* ── Language Switcher ── */
+        .lang-switcher {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            gap: 6px;
+            z-index: 100;
+        }
+        .lang-btn {
+            padding: 4px 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            border: 1px solid rgba(212,175,55,0.2);
+            background: transparent;
+            color: #6a6050;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: auto;
+        }
+        .lang-btn:hover { color: var(--gold); border-color: var(--gold-dim); }
+        .lang-btn.active {
+            color: var(--gold-light);
+            border-color: var(--gold);
+            background: rgba(212,175,55,0.1);
+        }
     </style>
 </head>
 <body>
+    <!-- Language Switcher -->
+    <div class="lang-switcher" id="lang-switcher">
+        <button class="lang-btn active" onclick="setLang('tr')">TR</button>
+        <button class="lang-btn" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('de')">DE</button>
+    </div>
+
     <h1 class="game-title">TAVLA</h1>
 
     <!-- ── Setup Screen ── -->
     <div id="setup">
-        <p class="subtitle">Arkadaşınla Oyna</p>
-        <button class="btn-primary" onclick="createGame()" id="create-btn">Oyun Oluştur</button>
-        <div class="divider">aktif oyunlar</div>
+        <p class="subtitle" data-i18n="subtitle"></p>
+        <button class="btn-primary" onclick="createGame()" id="create-btn" data-i18n="createGame"></button>
+        <div class="divider" data-i18n="activeGames"></div>
         <div id="game-list" class="game-list">
-            <div class="lobby-status" id="lobby-status"><span class="spinner"></span>Oyunlar aranıyor…</div>
+            <div class="lobby-status" id="lobby-status"><span class="spinner"></span><span data-i18n="searching"></span></div>
         </div>
-        <div class="divider">veya kod gir</div>
+        <div class="divider" data-i18n="enterCode"></div>
         <div class="manual-join">
             <input type="text" id="joinId" placeholder="ABCD" maxlength="4">
-            <button class="btn-secondary btn-sm" onclick="joinGame()" id="join-btn">Katıl</button>
+            <button class="btn-secondary btn-sm" onclick="joinGame()" id="join-btn" data-i18n="join"></button>
         </div>
     </div>
 
@@ -810,20 +846,20 @@
             <div class="hud-left">
                 <div class="hud-status">
                     <div class="dot" id="conn-dot"></div>
-                    <span id="conn-label">Bekleniyor…</span>
+                    <span id="conn-label" data-i18n="waiting"></span>
                 </div>
                 <div class="hud-id"><span>ID:</span><span id="display-id">...</span></div>
-                <button class="btn-secondary btn-sm" onclick="location.reload()" style="width:auto; margin-left:10px">Yeni Oyun</button>
+                <button class="btn-secondary btn-sm" onclick="location.reload()" style="width:auto; margin-left:10px" data-i18n="newGame"></button>
             </div>
             <div class="dice-area">
                 <div class="die" id="die1" data-value="0"></div>
                 <div class="die" id="die2" data-value="0"></div>
                 <div class="die" id="die3" data-value="0"></div>
                 <div class="die" id="die4" data-value="0"></div>
-                <button class="roll-btn" id="roll-btn" onclick="rollDice()">Zar At</button>
+                <button class="roll-btn" id="roll-btn" onclick="rollDice()" data-i18n="roll"></button>
             </div>
             <div class="hud-right">
-                <div class="hud-turn" id="turn-label">SENİN SIRAN</div>
+                <div class="hud-turn" id="turn-label" data-i18n="yourTurn"></div>
             </div>
         </div>
 
@@ -832,6 +868,120 @@
     </div>
 
     <script>
+        /* ── i18n ── */
+        const translations = {
+            tr: {
+                subtitle: 'Arkadaşınla Oyna',
+                createGame: 'Oyun Oluştur',
+                activeGames: 'aktif oyunlar',
+                searching: 'Oyunlar aranıyor…',
+                lobbyEmpty: 'Aktif oyun bulunamadı. Bir tane oluştur!',
+                enterCode: 'veya kod gir',
+                join: 'Katıl',
+                joinArrow: 'Katıl →',
+                waiting: 'Bekleniyor…',
+                newGame: 'Yeni Oyun',
+                roll: 'Zar At',
+                endTurn: 'Sırayı Bitir',
+                yourTurn: 'SENİN SIRAN',
+                opponentTurn: 'RAKİBİN SIRASI',
+                moves: 'HAMLE',
+                noLegalMoves: 'HAMLE YOK - OTOMATİK GEÇİLİYOR...',
+                noMovesLeft: 'HAMLE KALMADI',
+                connected: 'Bağlandı',
+                disconnected: 'Bağlantı kesildi',
+                gameNotFound: 'Oyun bulunamadı. Başlamış veya süresi dolmuş olabilir.',
+                connError: 'Bağlantı hatası: ',
+                connFailed: 'Bağlantı başlatılamadı.',
+                whiteWins: 'BEYAZ KAZANDI!',
+                blackWins: 'SİYAH KAZANDI!'
+            },
+            en: {
+                subtitle: 'Play with a Friend',
+                createGame: 'Create Game',
+                activeGames: 'active games',
+                searching: 'Searching for games…',
+                lobbyEmpty: 'No active games found. Create one!',
+                enterCode: 'or enter code',
+                join: 'Join',
+                joinArrow: 'Join →',
+                waiting: 'Waiting…',
+                newGame: 'New Game',
+                roll: 'Roll',
+                endTurn: 'End Turn',
+                yourTurn: 'YOUR TURN',
+                opponentTurn: "OPPONENT'S TURN",
+                moves: 'MOVES',
+                noLegalMoves: 'NO LEGAL MOVES - AUTO-SKIPPING...',
+                noMovesLeft: 'NO MOVES LEFT',
+                connected: 'Connected',
+                disconnected: 'Disconnected',
+                gameNotFound: 'Game not found. It may have started or expired.',
+                connError: 'Connection error: ',
+                connFailed: 'Failed to connect.',
+                whiteWins: 'WHITE WINS!',
+                blackWins: 'BLACK WINS!'
+            },
+            de: {
+                subtitle: 'Spiel mit einem Freund',
+                createGame: 'Spiel erstellen',
+                activeGames: 'aktive Spiele',
+                searching: 'Spiele werden gesucht…',
+                lobbyEmpty: 'Keine aktiven Spiele gefunden. Erstelle eins!',
+                enterCode: 'oder Code eingeben',
+                join: 'Beitreten',
+                joinArrow: 'Beitreten →',
+                waiting: 'Warten…',
+                newGame: 'Neues Spiel',
+                roll: 'Würfeln',
+                endTurn: 'Zug beenden',
+                yourTurn: 'DEIN ZUG',
+                opponentTurn: 'GEGNER AM ZUG',
+                moves: 'ZÜGE',
+                noLegalMoves: 'KEIN LEGALER ZUG - WIRD ÜBERSPRUNGEN...',
+                noMovesLeft: 'KEINE ZÜGE ÜBRIG',
+                connected: 'Verbunden',
+                disconnected: 'Verbindung getrennt',
+                gameNotFound: 'Spiel nicht gefunden. Es wurde vielleicht schon gestartet.',
+                connError: 'Verbindungsfehler: ',
+                connFailed: 'Verbindung fehlgeschlagen.',
+                whiteWins: 'WEISS GEWINNT!',
+                blackWins: 'SCHWARZ GEWINNT!'
+            }
+        };
+
+        let currentLang = localStorage.getItem('tavla-lang') || 'tr';
+
+        function t(key) {
+            return (translations[currentLang] || translations.tr)[key] || translations.tr[key] || key;
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('tavla-lang', lang);
+            document.documentElement.lang = lang === 'de' ? 'de' : lang === 'en' ? 'en' : 'tr';
+            // Update switcher buttons
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === lang.toUpperCase());
+            });
+            applyLang();
+        }
+
+        function applyLang() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.getAttribute('data-i18n'));
+            });
+            // Re-render game list if visible
+            if (typeof renderGameList === 'function') renderGameList();
+            // Re-render HUD if game is active
+            if (typeof updateHUD === 'function' && !document.getElementById('game-container').classList.contains('hidden')) {
+                updateHUD();
+            }
+        }
+
+        // Apply on load
+        document.addEventListener('DOMContentLoaded', () => setLang(currentLang));
+
         /* ── PeerJS & Game State ── */
         let peer, conn;
         let myRole = 'host';
