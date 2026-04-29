@@ -1176,6 +1176,8 @@
                 peer.on('error', (err) => {
                     console.error("PeerJS Error:", err);
                     if (err.type === 'peer-unavailable') {
+                        if (err.message && err.message.includes(LOBBY_ID)) return;
+                        if (myRole === 'host') return; // Hosts don't join games, so they can't get gameNotFound
                         alert(t('gameNotFound'));
                     } else if (err.type !== 'unavailable-id') {
                         alert(t('connError') + err.type);
